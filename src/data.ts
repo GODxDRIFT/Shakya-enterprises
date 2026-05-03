@@ -26,7 +26,7 @@ export const PRODUCTS: Product[] = [
   ],
   materials: '100% Cotton / Cotton-blend fabric',
   care: 'Machine wash cold, tumble dry low, do not bleach'
-}
+},
   { id:'9', name:'Kantha Stitch Bedroom Cushion', category:'Cushions', price:'$35', priceINR:'₹2,899', image:'https://images.unsplash.com/photo-1567016432779-094069958ea5?auto=format&fit=crop&q=80&w=800', description:'Luxury cushion with kantha embroidery.', details:['18×18 inch with insert','Kantha stitch embroidery','Invisible zip'], materials:'Velvet front, cotton back, polyester fill', care:'Spot clean only' },
 ];
 
