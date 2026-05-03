@@ -132,7 +132,7 @@ const FloatingButtons = () => {
   }, []);
   return (
     <>
-      <a href="https://wa.me/919876543210?text=Hi%20Shakya%20Enterprises!" target="_blank" rel="noopener noreferrer" className="fixed bottom-6 left-6 z-[90] w-14 h-14 bg-green-500 text-white rounded-full flex items-center justify-center shadow-xl hover:bg-green-600 transition-colors hover:scale-110 transform"><MessageCircle size={26} /></a>
+      <a href="https://wa.me/918750590574?text=Hi%20Shakya%20Enterprises!" target="_blank" rel="noopener noreferrer" className="fixed bottom-6 left-6 z-[90] w-14 h-14 bg-green-500 text-white rounded-full flex items-center justify-center shadow-xl hover:bg-green-600 transition-colors hover:scale-110 transform"><MessageCircle size={26} /></a>
       {show && <button onClick={() => window.scrollTo({ top:0, behavior:'smooth' })} className="fixed bottom-6 right-6 z-[90] w-12 h-12 bg-brand-charcoal text-white rounded-full flex items-center justify-center shadow-xl hover:bg-brand-olive transition-colors"><ChevronUp size={20} /></button>}
     </>
   );

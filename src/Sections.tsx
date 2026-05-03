@@ -201,9 +201,9 @@ export const Footer = () => (
         </div>
         <div><h4 className="text-[10px] uppercase tracking-[0.2em] font-bold mb-8 text-brand-gold">Contact</h4>
           <ul className="space-y-6 text-sm text-white/80">
-            <li className="flex items-start gap-3"><MapPin size={16} className="text-brand-gold shrink-0 mt-1" /><span>Jaipur, Rajasthan, India<br/>Pin: 302001</span></li>
-            <li className="flex items-center gap-3"><Phone size={16} className="text-brand-gold shrink-0" /><span>+91 98765 43210</span></li>
-            <li className="flex items-center gap-3"><Mail size={16} className="text-brand-gold shrink-0" /><span>concierge@shakyaenterprises.com</span></li>
+            <li className="flex items-start gap-3"><MapPin size={16} className="text-brand-gold shrink-0 mt-1" /><span>Vikas Nagar, New Delhi, India<br/>Pin: 110059</span></li>
+            <li className="flex items-center gap-3"><Phone size={16} className="text-brand-gold shrink-0" /><span>+91 87505 90574</span></li>
+            <li className="flex items-center gap-3"><Mail size={16} className="text-brand-gold shrink-0" /><span>Lalshakya27@gmail.com</span></li>
           </ul>
         </div>
         <div><h4 className="text-[10px] uppercase tracking-[0.2em] font-bold mb-8 text-brand-gold">Client Care</h4>
