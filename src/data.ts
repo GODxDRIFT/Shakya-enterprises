@@ -6,12 +6,27 @@ export interface Product {
 export const PRODUCTS: Product[] = [
   { id:'1', name:'Jaipuri Hand-Block Rajai', category:'Rajai', price:'$85', priceINR:'₹6,999', image:'https://images.unsplash.com/photo-1616486029423-aaa4789e8c9a?auto=format&fit=crop&q=80&w=800', description:'Traditional cotton filled quilt with intricate hand-block prints.', details:['Double-bed size 90×90 inch','Cotton fill 300 GSM','Reversible design'], materials:'100% cotton, natural dyes', care:'Dry clean or gentle machine wash cold' },
   { id:'2', name:'Soft Cotton Fitted Bedsheet', category:'Bedsheets', price:'$45', priceINR:'₹3,699', image:'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&q=80&w=800', description:'400 thread-count long-staple cotton.', details:['400 thread count','Deep pocket 15 inch','6 sizes available'], materials:'100% Giza long-staple cotton', care:'Machine wash cold, tumble dry low' },
-  { id:'3', name:'Quilted Cushion Cover Set', category:'Cushions', price:'$28', priceINR:'₹2,299', image:'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&q=80&w=800', description:'Set of 5 quilted covers with velvet piping.', details:['Set of 5','16×16 inch standard','Hidden zip closure'], materials:'Cotton canvas with velvet piping', care:'Spot clean or dry clean' },
-  { id:'4', name:'Ethnic Embroidered Shoulder Bag', category:'Bags', price:'$32', priceINR:'₹2,599', image:'https://images.unsplash.com/photo-1591561954557-26941169b49e?auto=format&fit=crop&q=80&w=800', description:'Handcrafted bag with mirror work and embroidery.', details:['Internal zip pocket','Adjustable strap','14×10 inch'], materials:'Cotton canvas, mirror work, silk thread', care:'Wipe with damp cloth' },
-  { id:'5', name:'Linen Table Runner', category:'Runners', price:'$24', priceINR:'₹1,999', image:'https://images.unsplash.com/photo-1603512803657-f9d6ea4e4122?auto=format&fit=crop&q=80&w=800', description:'Block-print runner for modern dining.', details:['14×72 inch','Block-print border','Heat resistant'], materials:'100% pure linen', care:'Machine wash delicate cycle' },
+  { id:'3', name:'Quilted Cushion Cover Set', category:'Cushions', price:'$28', priceINR:'₹2,299', image:'https://encrypted-tbn1.gstatic.com/shopping?q=tbn:ANd9GcRd_CoJs2jrsOLcNlqDhBCod1yPGNZyAg0aKNW2E4KCmEb5lpZ9ZulR-AcSLC_ZIF8Lqa2U0tJ1cB48sXCo05Y3jLmIA2I52YIOPm-q1JI', description:'Set of 5 quilted covers with velvet piping.', details:['Set of 5','16×16 inch standard','Hidden zip closure'], materials:'Cotton canvas with velvet piping', care:'Spot clean or dry clean' },
+  { id:'4', name:'Ethnic Embroidered Shoulder Bag', category:'Bags', price:'$32', priceINR:'₹2,599', image:'https://encrypted-tbn0.gstatic.com/shopping?q=tbn:ANd9GcTq4xmyhVYjxBrcSUxUhbwmxzmOTrtgOzWDJUt6d30U4O9OC_tFa6Wly-wbxGpPnW9U8GETac9RcZ4x66xmGg-QRMW88zL7', description:'Handcrafted bag with mirror work and embroidery.', details:['Internal zip pocket','Adjustable strap','14×10 inch'], materials:'Cotton canvas, mirror work, silk thread', care:'Wipe with damp cloth' },
+  { id:'5', name:'Linen Table Runner', category:'Runners', price:'$24', priceINR:'₹1,999', image:'https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcQQAl9DJS0MQBl3wzXQpjJE2UiyVOVZ6gFJiKR3GeU9_rZzld1qvKXEEnsUottFflzUlJi1BZFVxU580DwA5nE9uunBgi7OXXjoHivnEDk', description:'Block-print runner for modern dining.', details:['14×72 inch','Block-print border','Heat resistant'], materials:'100% pure linen', care:'Machine wash delicate cycle' },
   { id:'6', name:'Jaipuri Cotton Dohar', category:'Home Furnishing', price:'$55', priceINR:'₹4,499', image:'https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&q=80&w=800', description:'Reversible lightweight summer AC quilt.', details:['Double-bed size','Lightweight 150 GSM','Perfect for AC rooms'], materials:'100% mulmul cotton, azo-free dyes', care:'Gentle machine wash, dry in shade' },
   { id:'7', name:'Block-Print King Duvet Cover', category:'Bedsheets', price:'$68', priceINR:'₹5,599', image:'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&q=80&w=800', description:'King-size duvet cover in signature Jaipuri print.', details:['King size 104×90 inch','Button closure','Pillowcases included'], materials:'200TC percale cotton', care:'Machine wash 30°C' },
-  { id:'8', name:'Rajasthani Wall Tapestry', category:'Home Furnishing', price:'$72', priceINR:'₹5,899', image:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=800', description:'Statement tapestry with hand-stitched motifs.', details:['60×90 inch display','Hanging rod included','Unique numbered piece'], materials:'Cotton canvas, natural dye pigments', care:'Dry clean or hand wash cold' },
+  { 
+  id: '8',
+  name: 'Premium Fitted Bedsheet',
+  category: 'Home Furnishing',
+  price: '$42',
+  priceINR: '₹3,499',
+  image: 'https://rukminim2.flixcart.com/image/1366/1366/xif0q/bedsheet/m/n/s/elastic-fitted-double-bedsheet-1-fitted-bedsheet-fitted-elastic-original-imahk55cqhtapmqp.jpeg?q=90',
+  description: 'Soft, stretchable fitted bedsheet with snug elastic edges for a perfect mattress fit.',
+  details: [
+    'Fits mattresses up to 8 inch depth',
+    '360° elastic for secure grip',
+    'Wrinkle-resistant & breathable fabric'
+  ],
+  materials: '100% Cotton / Cotton-blend fabric',
+  care: 'Machine wash cold, tumble dry low, do not bleach'
+}
   { id:'9', name:'Kantha Stitch Bedroom Cushion', category:'Cushions', price:'$35', priceINR:'₹2,899', image:'https://images.unsplash.com/photo-1567016432779-094069958ea5?auto=format&fit=crop&q=80&w=800', description:'Luxury cushion with kantha embroidery.', details:['18×18 inch with insert','Kantha stitch embroidery','Invisible zip'], materials:'Velvet front, cotton back, polyester fill', care:'Spot clean only' },
 ];
 
