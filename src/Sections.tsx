@@ -40,7 +40,7 @@ export const HeritageSection = () => (
         </div>
       </motion.div>
       <motion.div initial={{ opacity:0, scale:0.95 }} whileInView={{ opacity:1, scale:1 }} viewport={{ once:true }} className="relative">
-        <div className="aspect-[4/5] overflow-hidden bg-brand-sand"><img src="https://images.unsplash.com/photo-1584485558459-2ad62788c1b2?auto=format&fit=crop&q=80&w=1000" alt="Craftsmanship" className="w-full h-full object-cover" referrerPolicy="no-referrer" /></div>
+        <div className="aspect-[4/5] overflow-hidden bg-brand-sand"><img src="https://thelabelhome.com/cdn/shop/files/E838AEB1-50F3-4F7A-8089-989F4E693B3B.jpg?v=1757519228&width=1100" alt="Craftsmanship" className="w-full h-full object-cover" referrerPolicy="no-referrer" /></div>
         <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-brand-olive p-8 flex items-center justify-center shadow-2xl"><p className="serif text-white italic text-xl text-center leading-relaxed">"Preserving art, one thread at a time."</p></div>
       </motion.div>
     </div>
@@ -51,8 +51,8 @@ export const ProcessSection = () => (
   <section className="py-32 px-6 md:px-12 bg-brand-charcoal text-white overflow-hidden">
     <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
       <div className="order-2 lg:order-1 grid grid-cols-2 gap-4">
-        <motion.img initial={{ opacity:0, y:50 }} whileInView={{ opacity:1, y:0 }} viewport={{ once:true }} src="https://images.unsplash.com/photo-1605282717088-b217a1dfa539?auto=format&fit=crop&q=80&w=600" alt="Block Printing" className="w-full aspect-square object-cover" />
-        <motion.img initial={{ opacity:0, y:100 }} whileInView={{ opacity:1, y:0 }} viewport={{ once:true }} transition={{ delay:0.2 }} src="https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&q=80&w=600" alt="Dyeing" className="w-full aspect-[3/4] object-cover -translate-y-12" />
+        <motion.img initial={{ opacity:0, y:50 }} whileInView={{ opacity:1, y:0 }} viewport={{ once:true }} src="https://floridadecor.in/cdn/shop/files/MILANTHREEPCSBEDCOVER_page-0003.jpg?v=1708604674&width=720" alt="Block Printing" className="w-full aspect-square object-cover" />
+        <motion.img initial={{ opacity:0, y:100 }} whileInView={{ opacity:1, y:0 }} viewport={{ once:true }} transition={{ delay:0.2 }} src="https://www.karmadori.com/cdn/shop/files/TC2a_02d66076-27bb-4c91-b3c9-7077b52fede9.jpg?v=1748605427&width=1200" alt="Dyeing" className="w-full aspect-[3/4] object-cover -translate-y-12" />
       </div>
       <div className="order-1 lg:order-2">
         <p className="text-brand-gold font-bold uppercase tracking-[0.2em] text-[10px] mb-6">The Artisans' Touch</p>
