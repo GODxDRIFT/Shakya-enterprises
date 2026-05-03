@@ -152,9 +152,9 @@ export const ContactSection = () => {
           <h2 className="serif text-4xl md:text-5xl text-brand-charcoal mb-8 leading-tight">Let's Start a <span className="italic text-brand-olive">Conversation</span></h2>
           <p className="text-brand-charcoal/70 mb-10">Whether you're looking for custom orders, bulk pricing, or simply want to know more about our collections — we'd love to hear from you.</p>
           <div className="space-y-6 text-sm text-brand-charcoal/80">
-            <div className="flex items-center gap-3"><MapPin size={16} className="text-brand-gold" /><span>Jaipur, Rajasthan, India 302001</span></div>
-            <div className="flex items-center gap-3"><Phone size={16} className="text-brand-gold" /><span>+91 98765 43210</span></div>
-            <div className="flex items-center gap-3"><Mail size={16} className="text-brand-gold" /><span>concierge@shakyaenterprises.com</span></div>
+            <div className="flex items-center gap-3"><MapPin size={16} className="text-brand-gold" /><span>Vikas Nagar, New Delhi, India 110059</span></div>
+            <div className="flex items-center gap-3"><Phone size={16} className="text-brand-gold" /><span>+91 87505 90574</span></div>
+            <div className="flex items-center gap-3"><Mail size={16} className="text-brand-gold" /><span>Lalshakya27@gmail.com</span></div>
           </div>
         </div>
         <div className="bg-white p-8 md:p-12 border border-brand-charcoal/5">
