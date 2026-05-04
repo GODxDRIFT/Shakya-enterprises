@@ -32,7 +32,7 @@ export const Navbar = ({ onOpenCart, cartCount }: { onOpenCart: () => void; cart
 
   const c = scrolled ? 'text-brand-charcoal' : 'text-white';
   return (
-    <nav className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-500 px-6 py-4 flex items-center justify-between", scrolled ? "bg-white/95 backdrop-blur-xl border-b border-brand-charcoal/5 shadow-sm py-3" : "bg-gradient-to-b from-black/60 to-transparent")}>
+    <nav className={cn("fixed top-[40px] left-0 right-0 z-50 transition-all duration-500 px-6 py-4 flex items-center justify-between", scrolled ? "bg-white/95 backdrop-blur-xl border-b border-brand-charcoal/5 shadow-sm py-3" : "bg-gradient-to-b from-black/60 to-transparent")}>
       <div className="flex items-center gap-6">
         <button onClick={() => setMobileOpen(true)} className={cn("lg:hidden", c)}><Menu size={24} /></button>
         <div className={cn("hidden lg:flex items-center gap-8 text-[11px] font-bold tracking-[0.15em] uppercase", c)}>
