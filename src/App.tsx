@@ -3,7 +3,7 @@ import { ShoppingBag, X, Globe, ShieldCheck, MessageCircle, ChevronUp } from 'lu
 import { useState, useEffect } from 'react';
 import { cn } from './lib/utils';
 import { PRODUCTS, CATEGORIES, type Product, type CartItem } from './data';
-import { AnnouncementBar, Navbar } from './Navbar';
+import { AnnouncementBar, Navbar, BAR_HEIGHT } from './Navbar';
 import { Hero, HeritageSection, ProcessSection, CustomSection, LookbookSection, TestimonialsSection, FAQSection, ContactSection, Footer } from './Sections';
 
 // --- Product Detail Modal ---

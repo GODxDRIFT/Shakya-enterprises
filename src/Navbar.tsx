@@ -3,7 +3,7 @@ import { Menu, X, ShoppingBag, Search, ChevronDown, Instagram, Facebook } from '
 import { useState, useEffect, useRef } from 'react';
 import { cn } from './lib/utils';
 
-const BAR_HEIGHT = 40; // px — announcement bar ki height
+const BAR_HEIGHT = 40;
 
 export const AnnouncementBar = ({ onClose }: { onClose: () => void }) => {
   return (
