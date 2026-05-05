@@ -169,7 +169,7 @@ export const Navbar = ({
                 ['#faq', 'faq'],
                 ['#contact', 'contact'],
               ].map(([h, l]) => (
-                
+                <a
                   key={h}
                   href={h}
                   onClick={() => setMobileOpen(false)}
