@@ -143,6 +143,9 @@ export default function App() {
   const [cartOpen, setCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [announcementVisible, setAnnouncementVisible] = useState(true); // YE ADD KAR
+
+  const topOffset = announcementVisible ? BAR_HEIGHT : 0; // YE ADD KAR
 
   const addToCart = (p: Product) => {
     setCart(prev => {
@@ -155,9 +158,20 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen">
-      <AnnouncementBar />
-      <Navbar onOpenCart={() => setCartOpen(true)} cartCount={cart.reduce((s,i) => s+i.qty, 0)} />
-      <main>
+      {/* ANNOUNCEMENT BAR — onClose prop pass kar */}
+      {announcementVisible && (
+        <AnnouncementBar onClose={() => setAnnouncementVisible(false)} />
+      )}
+
+      {/* NAVBAR — topOffset pass kar */}
+      <Navbar
+        onOpenCart={() => setCartOpen(true)}
+        cartCount={cart.reduce((s, i) => s + i.qty, 0)}
+        topOffset={topOffset}
+      />
+
+      {/* MAIN — paddingTop dynamically adjust hoga */}
+      <main style={{ paddingTop: topOffset + 64, transition: 'padding-top 0.3s ease' }}>
         <Hero />
         <HeritageSection />
         <ProductCatalog onSelect={setSelectedProduct} />
@@ -168,6 +182,7 @@ export default function App() {
         <FAQSection />
         <ContactSection />
       </main>
+
       <Footer />
       <FloatingButtons />
       <AnimatePresence>{cartOpen && <CartDrawer items={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} />}</AnimatePresence>
