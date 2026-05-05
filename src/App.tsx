@@ -171,7 +171,7 @@ export default function App() {
       />
 
       {/* MAIN — paddingTop dynamically adjust hoga */}
-      <main style={{ paddingTop: topOffset + 64, transition: 'padding-top 0.3s ease' }}>
+      <main style={{ paddingTop: topOffset , transition: 'padding-top 0.3s ease' }}>
         <Hero />
         <HeritageSection />
         <ProductCatalog onSelect={setSelectedProduct} />
