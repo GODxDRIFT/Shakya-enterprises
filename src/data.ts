@@ -120,10 +120,10 @@ export const PRODUCTS: Product[] = [
     category: 'Bags',
     price: '$32',
     priceINR: '₹2,599',
-    image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&q=80&w=800',
+    image: 'https://encrypted-tbn0.gstatic.com/shopping?q=tbn:ANd9GcTq4xmyhVYjxBrcSUxUhbwmxzmOTrtgOzWDJUt6d30U4O9OC_tFa6Wly-wbxGpPnW9U8GETac9RcZ4x66xmGg-QRMW88zL7',
     images: [
-      'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&q=80&w=800',
+      'https://encrypted-tbn0.gstatic.com/shopping?q=tbn:ANd9GcTq4xmyhVYjxBrcSUxUhbwmxzmOTrtgOzWDJUt6d30U4O9OC_tFa6Wly-wbxGpPnW9U8GETac9RcZ4x66xmGg-QRMW88zL7',
+      
     ],
     description: 'Handcrafted bag with mirror work and embroidery.',
     details: ['Internal zip pocket', 'Adjustable strap', '14×10 inch'],
@@ -145,10 +145,10 @@ export const PRODUCTS: Product[] = [
     category: 'Runners',
     price: '$24',
     priceINR: '₹1,999',
-    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&q=80&w=800',
+    image: 'https://cdn.swadeshonline.com/v2/patient-paper-41f385/swad-p/wrkr/products/pictures/item/free/resize-w:700/swadesh/471011427/1/v0kIR37dWu-471011427001_1_LS.jpg',
     images: [
-      'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&q=80&w=800',
-      'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&q=80&w=800',
+      'https://cdn.swadeshonline.com/v2/patient-paper-41f385/swad-p/wrkr/products/pictures/item/free/resize-w:700/swadesh/471011427/1/v0kIR37dWu-471011427001_1_LS.jpg',
+      
     ],
     description: 'Block-print runner for modern dining.',
     details: ['14×72 inch', 'Block-print border', 'Heat resistant'],
