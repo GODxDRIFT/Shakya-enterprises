@@ -7,7 +7,8 @@ const CF_MODE       = process.env.CASHFREE_MODE || 'sandbox';
 const CF_BASE       = CF_MODE === 'production'
   ? 'https://api.cashfree.com/pg'
   : 'https://sandbox.cashfree.com/pg';
-const APP_URL       = process.env.APP_URL || 'https://shakya-enterprises.vercel.app';
+const CF_APP_ID = process.env.CASHFREE_APP_ID?.trim();
+const CF_SECRET_KEY = process.env.CASHFREE_SECRET_KEY?.trim();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
