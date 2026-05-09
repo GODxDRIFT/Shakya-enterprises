@@ -1,20 +1,33 @@
-// api/create-order.ts
+// api/create-order.ts  ← place this in your /api/ folder (for Vercel)
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const CF_APP_ID     = process.env.CASHFREE_APP_ID!;
-const CF_SECRET_KEY = process.env.CASHFREE_SECRET_KEY!;
+// ── env vars (set these in Vercel Dashboard → Settings → Environment Variables)
+const CF_APP_ID     = process.env.CASHFREE_APP_ID?.trim();
+const CF_SECRET_KEY = process.env.CASHFREE_SECRET_KEY?.trim();
 const CF_MODE       = process.env.CASHFREE_MODE || 'sandbox';
 const CF_BASE       = CF_MODE === 'production'
   ? 'https://api.cashfree.com/pg'
   : 'https://sandbox.cashfree.com/pg';
-const CF_APP_ID = process.env.CASHFREE_APP_ID?.trim();
-const CF_SECRET_KEY = process.env.CASHFREE_SECRET_KEY?.trim();
+const APP_URL       = process.env.APP_URL || 'http://localhost:3000';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // ── credentials check FIRST, before anything else
+  if (!CF_APP_ID || !CF_SECRET_KEY) {
+    return res.status(500).json({
+      error: 'Payment credentials not configured. Add CASHFREE_APP_ID and CASHFREE_SECRET_KEY in Vercel environment variables.',
+    });
+  }
 
   try {
-    const { orderId, amountINR, customer } = req.body;
+    const { orderId, amountINR, customer } = req.body as {
+      orderId: string;
+      amountINR: number;
+      customer: { name: string; email: string; phone: string };
+    };
 
     const cfRes = await fetch(`${CF_BASE}/orders`, {
       method: 'POST',
@@ -41,23 +54,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const data = await cfRes.json() as any;
-    if (!CF_APP_ID || !CF_SECRET_KEY) {
-  return res.status(500).json({ 
-    error: 'Payment credentials not configured' 
-  });
-}
 
     if (!cfRes.ok) {
+      console.error('Cashfree API error:', data);
       return res.status(400).json({ error: data.message || 'Order creation failed' });
     }
 
-    res.json({
+    return res.json({
       orderId: data.order_id,
       sessionId: data.payment_session_id,
       cfOrderId: data.cf_order_id,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Server error' });
+    console.error('Server error:', err);
+    return res.status(500).json({ error: err.message || 'Internal server error' });
   }
-  
 }
