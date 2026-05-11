@@ -5,7 +5,7 @@ import {
   Heart, Search, SlidersHorizontal, ArrowUpDown, Clock, Ruler,
   MapPin, Truck, Package, Tag,
 } from 'lucide-react';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from './lib/utils';
 import { PRODUCTS, CATEGORIES, BUNDLES, SIZE_GUIDE, getSizeGuideCategory, type Product, type CartItem, type Bundle } from './data';
 import { AnnouncementBar, Navbar } from './Navbar';
@@ -13,6 +13,8 @@ import { Hero, HeritageSection, ProcessSection, CustomSection, LookbookSection, 
 import { AdminDashboard } from './Admin';
 import { Stars, ReviewForm, ReviewList, RatingBadge, loadReviews, saveReviews, type Review } from './Reviews';
 import { analytics } from './analytics';
+import { AuthProvider, useAuth } from './AuthContext';
+import { orderService, reviewService, type FSOrder, type FSReview } from './firebase';
 
 // ─── localStorage helpers ─────────────────────────────────────────────────
 const LS = {
@@ -553,7 +555,8 @@ const FloatingButtons = () => {
 };
 
 // ─── Main App ─────────────────────────────────────────────────────────────
-export default function App() {
+function AppContent() {
+  const { user } = useAuth();
   const [cartOpen, setCartOpen]             = useState(false);
   const [checkoutOpen, setCheckoutOpen]     = useState(false);
   const [wishlistOpen, setWishlistOpen]     = useState(false);
@@ -562,15 +565,65 @@ export default function App() {
   const [cart, setCart]                     = useState<CartItem[]>(()=>LS.get('shakya_cart_v1',[]));
   const [wishlist, setWishlist]             = useState<string[]>(()=>LS.get('shakya_wishlist_v1',[]));
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>(()=>LS.get('shakya_recent_v1',[]));
-  const [orders, setOrders]                 = useState<Order[]>(()=>LS.get('shakya_orders_v1',[]));
-  const [reviews, setReviews]               = useState<Review[]>(loadReviews);
+  const [orders, setOrders]                 = useState<Order[]>([]);
+  const [reviews, setReviews]               = useState<Review[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product|null>(null);
   const [showAnnouncement, setShowAnnouncement] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+
+  // Load orders from Firestore when user changes
+  useEffect(() => {
+    if (user) {
+      setLoadingOrders(true);
+      orderService.getByUser(user.uid).then(fetchedOrders => {
+        const convertedOrders: Order[] = fetchedOrders.map(fsOrder => ({
+          id: fsOrder.id,
+          cfOrderId: fsOrder.cfOrderId,
+          date: fsOrder.date.toDate().toISOString(),
+          items: fsOrder.items as CartItem[],
+          customer: fsOrder.customer as CustomerInfo,
+          shipping: fsOrder.shipping as ShippingAddress,
+          totalINR: fsOrder.totalINR,
+          totalUSD: fsOrder.totalUSD,
+          status: fsOrder.status as Order['status'],
+        }));
+        setOrders(convertedOrders);
+        setLoadingOrders(false);
+      }).catch(() => setLoadingOrders(false));
+    } else {
+      setOrders([]);
+    }
+  }, [user]);
+
+  // Load reviews from Firestore
+  useEffect(() => {
+    setLoadingReviews(true);
+    reviewService.getAll().then(fetchedReviews => {
+      const convertedReviews: Review[] = fetchedReviews.map(fsReview => ({
+        id: fsReview.id,
+        productId: fsReview.productId,
+        rating: fsReview.rating,
+        title: '', // FSReview doesn't have title, so default
+        text: '', // FSReview doesn't have text, wait, let's check
+        name: fsReview.name,
+        location: '',
+        date: fsReview.date.toDate().toISOString(),
+        helpful: 0,
+      }));
+      setReviews(convertedReviews);
+      setLoadingReviews(false);
+    }).catch(() => {
+      // Fallback to localStorage
+      setReviews(loadReviews());
+      setLoadingReviews(false);
+    });
+  }, []);
 
   useEffect(()=>{LS.set('shakya_cart_v1',cart);},[cart]);
   useEffect(()=>{LS.set('shakya_wishlist_v1',wishlist);},[wishlist]);
   useEffect(()=>{LS.set('shakya_recent_v1',recentlyViewed);},[recentlyViewed]);
-  useEffect(()=>{LS.set('shakya_orders_v1',orders);},[orders]);
+  // Removed orders localStorage save
 
   const openProduct = useCallback((p: Product)=>{
     setSelectedProduct(p);
@@ -598,22 +651,96 @@ export default function App() {
 
   const toggleWishlist = useCallback((id:string)=>{
     setWishlist(prev=>prev.includes(id)?prev.filter(w=>w!==id):[...prev,id]);
+
+  const addToCart = useCallback((p: Product, size: string, color: string)=>{
+    setCart(prev=>{const existing=prev.find(i=>i.product.id===p.id&&i.selectedSize===size&&i.selectedColor===color);if(existing)return prev.map(i=>i.product.id===p.id&&i.selectedSize===size&&i.selectedColor===color?{...i,qty:i.qty+1}:i);return[...prev,{product:p,qty:1,selectedSize:size,selectedColor:color}];});
+    analytics.addToCart(p, size, color); // track
   },[]);
 
-  const handleOrderSuccess = useCallback((order: Order)=>{
-    setOrders(prev=>[...prev,order]);
+  const addBundleToCart = useCallback((bundle: Bundle)=>{
+    bundle.productIds.forEach(id=>{const p=PRODUCTS.find(pr=>pr.id===id);if(p)addToCart(p,p.variants.sizes[0],p.variants.colors[0].name);});
+  },[addToCart]);
+
+  const removeFromCart = useCallback((id:string,size:string,color:string)=>{
+    setCart(prev=>prev.filter(i=>!(i.product.id===id&&i.selectedSize===size&&i.selectedColor===color)));
+  },[]);
+
+  const updateQty = useCallback((id:string,size:string,color:string,qty:number)=>{
+    if(qty<=0){removeFromCart(id,size,color);return;}
+    setCart(prev=>prev.map(i=>i.product.id===id&&i.selectedSize===size&&i.selectedColor===color?{...i,qty}:i));
+  },[removeFromCart]);
+
+  const toggleWishlist = useCallback((id:string)=>{
+    setWishlist(prev=>prev.includes(id)?prev.filter(w=>w!==id):[...prev,id]);
+  },[]);
+
+  const handleOrderSuccess = useCallback(async (order: Order)=>{
+    if (user) {
+      const fsOrder: Omit<FSOrder, 'id'> = {
+        uid: user.uid,
+        cfOrderId: order.cfOrderId,
+        items: order.items,
+        customer: order.customer,
+        shipping: order.shipping,
+        totalINR: order.totalINR,
+        totalUSD: order.totalUSD,
+        status: order.status,
+        date: new Date(order.date),
+      };
+      await orderService.save(fsOrder);
+      // Reload orders
+      const fetchedOrders = await orderService.getByUser(user.uid);
+      const convertedOrders: Order[] = fetchedOrders.map(fsOrder => ({
+        id: fsOrder.id,
+        cfOrderId: fsOrder.cfOrderId,
+        date: fsOrder.date.toDate().toISOString(),
+        items: fsOrder.items as CartItem[],
+        customer: fsOrder.customer as CustomerInfo,
+        shipping: fsOrder.shipping as ShippingAddress,
+        totalINR: fsOrder.totalINR,
+        totalUSD: fsOrder.totalUSD,
+        status: fsOrder.status as Order['status'],
+      }));
+      setOrders(convertedOrders);
+    } else {
+      // If no user, still add to local state for now
+      setOrders(prev=>[...prev,order]);
+    }
     setCart([]);
     setCheckoutOpen(false);
-  },[]);
+  },[user]);
 
   const refreshOrderStatus = useCallback(async(orderId:string)=>{
     try{const res=await fetch(`/api/order-status/${orderId}`);const data=await res.json() as {status:string};setOrders(prev=>prev.map(o=>o.id===orderId?{...o,status:data.status as Order['status']}:o));}
     catch(err){console.error('Status refresh failed:',err);}
   },[]);
 
-  const handleAddReview = useCallback((r: Review)=>{
-    setReviews(prev=>{const exists=prev.find(x=>x.id===r.id);if(exists)return prev.map(x=>x.id===r.id?r:x);return[...prev,r];});
-  },[]);
+  const handleAddReview = useCallback(async (r: Review)=>{
+    const fsReview: Omit<FSReview, 'id'> = {
+      productId: r.productId,
+      uid: user?.uid || '',
+      name: r.name,
+      rating: r.rating,
+      title: r.title,
+      text: r.text,
+      date: new Date(r.date),
+    };
+    await reviewService.add(fsReview);
+    // Reload reviews
+    const fetchedReviews = await reviewService.getAll();
+    const convertedReviews: Review[] = fetchedReviews.map(fsReview => ({
+      id: fsReview.id,
+      productId: fsReview.productId,
+      rating: fsReview.rating,
+      title: fsReview.title,
+      text: fsReview.text,
+      name: fsReview.name,
+      location: '',
+      date: fsReview.date.toDate().toISOString(),
+      helpful: 0,
+    }));
+    setReviews(convertedReviews);
+  },[user]);
 
   const wishlistProducts = PRODUCTS.filter(p=>wishlist.includes(p.id));
 
@@ -650,5 +777,13 @@ export default function App() {
         {selectedProduct&&<ProductModal product={selectedProduct} onClose={()=>setSelectedProduct(null)} onAdd={addToCart} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={toggleWishlist} reviews={reviews} onAddReview={handleAddReview}/>}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

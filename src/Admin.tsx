@@ -7,7 +7,7 @@ import { cn } from './lib/utils';
 import { productService, orderService, reviewService, uploadToCloudinary, type FSProduct, type FSOrder, type FSReview } from './firebase';
 import { PRODUCTS } from './data';
 
-const ADMIN_PASSWORD = 'SHAKYA2024'; // change this!
+const ADMIN_PASSWORD = import.meta.env.ADMIN_PASSWORD || 'SHAKYA2024'; // change this!
 const ADMIN_EMAILS   = ['admin@shakyaenterprises.com']; // add your email here
 
 // ── Field helper ───────────────────────────────────────────────────────────
