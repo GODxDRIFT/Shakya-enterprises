@@ -653,28 +653,6 @@ function AppContent() {
     setWishlist(prev=>prev.includes(id)?prev.filter(w=>w!==id):[...prev,id]);
   },[]);
 
-  const addToCart = useCallback((p: Product, size: string, color: string)=>{
-    setCart(prev=>{const existing=prev.find(i=>i.product.id===p.id&&i.selectedSize===size&&i.selectedColor===color);if(existing)return prev.map(i=>i.product.id===p.id&&i.selectedSize===size&&i.selectedColor===color?{...i,qty:i.qty+1}:i);return[...prev,{product:p,qty:1,selectedSize:size,selectedColor:color}];});
-    analytics.addToCart(p, size, color); // track
-  },[]);
-
-  const addBundleToCart = useCallback((bundle: Bundle)=>{
-    bundle.productIds.forEach(id=>{const p=PRODUCTS.find(pr=>pr.id===id);if(p)addToCart(p,p.variants.sizes[0],p.variants.colors[0].name);});
-  },[addToCart]);
-
-  const removeFromCart = useCallback((id:string,size:string,color:string)=>{
-    setCart(prev=>prev.filter(i=>!(i.product.id===id&&i.selectedSize===size&&i.selectedColor===color)));
-  },[]);
-
-  const updateQty = useCallback((id:string,size:string,color:string,qty:number)=>{
-    if(qty<=0){removeFromCart(id,size,color);return;}
-    setCart(prev=>prev.map(i=>i.product.id===id&&i.selectedSize===size&&i.selectedColor===color?{...i,qty}:i));
-  },[removeFromCart]);
-
-  const toggleWishlist = useCallback((id:string)=>{
-    setWishlist(prev=>prev.includes(id)?prev.filter(w=>w!==id):[...prev,id]);
-  },[]);
-
   const handleOrderSuccess = useCallback(async (order: Order)=>{
     if (user) {
       const fsOrder: Omit<FSOrder, 'id'> = {
