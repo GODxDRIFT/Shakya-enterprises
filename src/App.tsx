@@ -5,7 +5,7 @@ import {
   Heart, Search, SlidersHorizontal, ArrowUpDown, Clock, Ruler,
   MapPin, Truck, Package, Tag,
 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from './lib/utils';
 import { PRODUCTS, CATEGORIES, BUNDLES, SIZE_GUIDE, getSizeGuideCategory, type Product, type CartItem, type Bundle } from './data';
 import { AnnouncementBar, Navbar } from './Navbar';
