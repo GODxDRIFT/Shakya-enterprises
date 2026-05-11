@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from 'motion/react';
-import { Menu, X, ShoppingBag, Search, ChevronDown, Instagram, Facebook, Heart, Package, LayoutDashboard } from 'lucide-react';
+import { Menu, X, ShoppingBag, Search, ChevronDown, Instagram, Facebook, Heart, Package, LayoutDashboard, User } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from './lib/utils';
+import { useAuth } from './AuthContext';
 
 export const AnnouncementBar = ({ onClose }: { onClose: () => void }) => (
   <div className="bg-brand-charcoal text-white text-[10px] font-bold uppercase tracking-[0.2em] py-2.5 px-4 flex items-center justify-center gap-6 relative">
@@ -14,13 +15,16 @@ export const AnnouncementBar = ({ onClose }: { onClose: () => void }) => (
 
 export const Navbar = ({
   onOpenCart, cartCount, onOpenWishlist, wishlistCount,
-  onOpenOrders, ordersCount, onOpenAdmin,
+  onOpenOrders, ordersCount, onOpenAdmin, onOpenAuth, onOpenDashboard,
 }: {
   onOpenCart: () => void; cartCount: number;
   onOpenWishlist: () => void; wishlistCount: number;
   onOpenOrders: () => void; ordersCount: number;
   onOpenAdmin: () => void;
+  onOpenAuth: () => void;
+  onOpenDashboard: () => void;
 }) => {
+  const { user } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currency, setCurrency] = useState('USD');
@@ -76,12 +80,22 @@ export const Navbar = ({
           {wishlistCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{wishlistCount}</span>}
         </button>
 
-        <button onClick={onOpenOrders} className="relative hover:text-brand-gold transition-colors" title="My Orders">
+        <button onClick={onOpenOrders} className="relative hover:text-brand-gold transition-colors hidden sm:block" title="My Orders">
           <Package size={20} strokeWidth={1.5} />
           {ordersCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-brand-gold text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{ordersCount}</span>}
         </button>
 
-        {/* Admin — subtle, only visible on hover in scrolled state */}
+        {/* User account / login button */}
+        <button
+          onClick={user ? onOpenDashboard : onOpenAuth}
+          title={user ? `My Account (${user.email})` : 'Sign In'}
+          className={cn("relative hover:text-brand-gold transition-colors", user ? "text-brand-gold" : "")}
+        >
+          <User size={20} strokeWidth={1.5} />
+          {user && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />}
+        </button>
+
+        {/* Admin — subtle */}
         <button onClick={onOpenAdmin} title="Admin" className={cn("transition-colors hover:text-brand-gold", scrolled ? "opacity-20 hover:opacity-100" : "opacity-0 pointer-events-none")}>
           <LayoutDashboard size={16} strokeWidth={1.5} />
         </button>
@@ -100,6 +114,7 @@ export const Navbar = ({
         </button>
       </div>
 
+      {/* Mobile menu */}
       <AnimatePresence>
         {mobileOpen && (
           <motion.div initial={{ opacity:0, x:'-100%' }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:'-100%' }} transition={{ type:'tween', duration:0.4 }} className="fixed inset-0 bg-brand-cream z-50 flex flex-col p-8">
@@ -109,9 +124,12 @@ export const Navbar = ({
                 <a key={h} href={h} onClick={() => setMobileOpen(false)} className="hover:text-brand-gold transition-colors">{l}</a>
               ))}
             </div>
-            <div className="mt-8 flex gap-6">
+            <div className="mt-8 flex flex-wrap gap-4">
               <button onClick={() => { onOpenWishlist(); setMobileOpen(false); }} className="flex items-center gap-2 text-sm text-brand-charcoal/60 font-bold uppercase tracking-widest"><Heart size={16}/> Wishlist</button>
               <button onClick={() => { onOpenOrders(); setMobileOpen(false); }} className="flex items-center gap-2 text-sm text-brand-charcoal/60 font-bold uppercase tracking-widest"><Package size={16}/> Orders</button>
+              <button onClick={() => { user ? onOpenDashboard() : onOpenAuth(); setMobileOpen(false); }} className="flex items-center gap-2 text-sm text-brand-charcoal/60 font-bold uppercase tracking-widest">
+                <User size={16}/> {user ? 'My Account' : 'Sign In'}
+              </button>
             </div>
             <div className="mt-auto pt-12 border-t border-brand-charcoal/10 flex gap-6 text-brand-charcoal">
               <Instagram size={24} strokeWidth={1} className="hover:text-brand-gold cursor-pointer" />

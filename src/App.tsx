@@ -13,6 +13,10 @@ import { Hero, HeritageSection, ProcessSection, CustomSection, LookbookSection, 
 import { AdminDashboard } from './Admin';
 import { Stars, ReviewForm, ReviewList, RatingBadge, loadReviews, saveReviews, type Review } from './Reviews';
 import { analytics } from './analytics';
+import { AuthModal } from './CustomerAuth';
+import { CustomerDashboard } from './CustomerDashboard';
+import { useAuth } from './AuthContext';
+import { orderService } from './firebase';
 
 // ─── localStorage helpers ─────────────────────────────────────────────────
 const LS = {
@@ -161,7 +165,6 @@ const ProductModal = ({
       <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
         <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={onClose} className="absolute inset-0 bg-brand-charcoal/60 backdrop-blur-sm cursor-pointer" />
         <motion.div initial={{y:80,opacity:0}} animate={{y:0,opacity:1}} exit={{y:80,opacity:0}} transition={{type:'spring',damping:28}} className="relative bg-white w-full max-w-4xl max-h-[92vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 shadow-2xl rounded-t-3xl sm:rounded-2xl">
-          {/* Gallery */}
           <div className="flex flex-col gap-2 p-4 bg-brand-sand/30">
             <div className="relative aspect-square overflow-hidden bg-brand-sand group cursor-zoom-in" onClick={()=>setLightboxOpen(true)}>
               <motion.img key={activeImg} initial={{opacity:0}} animate={{opacity:1}} src={product.images[activeImg]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -170,7 +173,6 @@ const ProductModal = ({
             {product.images.length>1 && <div className="flex gap-2 overflow-x-auto pb-1">{product.images.map((img,i)=><button key={i} onClick={()=>setActiveImg(i)} className={cn("shrink-0 w-16 h-16 overflow-hidden border-2 transition-all",activeImg===i?"border-brand-charcoal":"border-transparent opacity-60 hover:opacity-100")}><img src={img} className="w-full h-full object-cover"/></button>)}</div>}
           </div>
 
-          {/* Details */}
           <div className="p-6 sm:p-8 flex flex-col overflow-y-auto">
             <div className="flex justify-between mb-3">
               <button onClick={()=>onToggleWishlist(product.id)} className={cn("flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest transition-colors",isWishlisted?"text-rose-500":"text-brand-charcoal/40 hover:text-rose-400")}>
@@ -183,7 +185,6 @@ const ProductModal = ({
             <h2 className="serif text-2xl text-brand-charcoal mb-1">{product.name}</h2>
             <p className="font-bold text-xl text-brand-olive mb-1">{product.price} <span className="text-sm text-brand-charcoal/40 font-normal">/ {product.priceINR}</span></p>
 
-            {/* Rating summary */}
             {productReviews.length > 0 && (
               <button onClick={()=>setTab('reviews')} className="flex items-center gap-2 mb-3 hover:opacity-70 transition-opacity">
                 <Stars rating={Math.round(avgRating)} size={12}/>
@@ -193,13 +194,11 @@ const ProductModal = ({
 
             <div className="mb-3"><StockBadge stock={product.stock}/></div>
 
-            {/* Colors */}
             <div className="mb-4">
               <p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/60 mb-2">Colour — <span className="text-brand-charcoal normal-case tracking-normal font-normal">{selectedColor}</span></p>
               <div className="flex gap-2 flex-wrap">{product.variants.colors.map(c=><button key={c.name} title={c.name} onClick={()=>setSelectedColor(c.name)} className={cn("w-8 h-8 rounded-full border-2 transition-all ring-1 ring-black/10",selectedColor===c.name?"border-brand-charcoal scale-110 shadow-md":"border-white/60 hover:scale-105")} style={{backgroundColor:c.hex}}/>)}</div>
             </div>
 
-            {/* Sizes */}
             <div className="mb-1">
               <div className="flex justify-between items-center mb-2"><p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/60">Size</p><button onClick={()=>setSizeGuideOpen(true)} className="text-[10px] uppercase tracking-widest text-brand-gold font-bold hover:underline flex items-center gap-1"><Ruler size={10}/> Size Guide</button></div>
               <div className="flex gap-2 flex-wrap mb-5">{product.variants.sizes.map(s=><button key={s} onClick={()=>setSelectedSize(s)} className={cn("px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all",selectedSize===s?"border-brand-charcoal bg-brand-charcoal text-white":"border-brand-charcoal/20 text-brand-charcoal/70 hover:border-brand-charcoal")}>{s}</button>)}</div>
@@ -207,7 +206,6 @@ const ProductModal = ({
 
             <PincodeEstimator />
 
-            {/* Tabs — now includes Reviews */}
             <div className="flex gap-3 border-b border-brand-charcoal/10 mb-4 overflow-x-auto">
               {(['desc','materials','care','reviews'] as const).map(t=>(
                 <button key={t} onClick={()=>setTab(t)} className={cn("text-[10px] uppercase tracking-widest font-bold pb-3 border-b-2 transition-colors whitespace-nowrap shrink-0",tab===t?"border-brand-olive text-brand-charcoal":"border-transparent text-brand-charcoal/40")}>
@@ -231,7 +229,6 @@ const ProductModal = ({
               )}
             </div>
 
-            {/* Add to cart */}
             <div className="flex items-center gap-3 mb-3">
               <div className="flex items-center border border-brand-charcoal/20">
                 <button onClick={()=>setQty(q=>Math.max(1,q-1))} className="w-9 h-9 flex items-center justify-center hover:bg-zinc-50 text-brand-charcoal text-lg">−</button>
@@ -272,7 +269,6 @@ const CheckoutModal = ({ cart, onClose, onSuccess }: { cart: CartItem[]; onClose
     if (!/^\d{10}$/.test(form.phone)){setErrorMsg('Enter a valid 10-digit phone number.');return;}
     if (!/\S+@\S+\.\S+/.test(form.email)){setErrorMsg('Enter a valid email address.');return;}
     setErrorMsg(''); setStep('processing');
-    // Track checkout start
     analytics.beginCheckout(totalUSD, cart.reduce((s,i)=>s+i.qty,0));
     try {
       await loadCashfreeSDK();
@@ -284,7 +280,6 @@ const CheckoutModal = ({ cart, onClose, onSuccess }: { cart: CartItem[]; onClose
       const result=await cashfree.checkout({paymentSessionId:data.sessionId,redirectTarget:'_modal'});
       if(result.error) throw new Error(result.error.message);
       const order:Order={id:orderId,cfOrderId:data.cfOrderId,date:new Date().toISOString(),items:cart,customer:{name:form.name,email:form.email,phone:form.phone},shipping:{address:form.address,city:form.city,state:form.state,pincode:form.pincode,country:form.country},totalINR,totalUSD:`$${totalUSD.toFixed(2)}`,status:'PAID'};
-      // Track purchase
       analytics.purchase(orderId, totalINR, `$${totalUSD.toFixed(2)}`);
       onSuccess(order); setStep('success');
     } catch(err:any){ setErrorMsg(err.message||'Payment failed. Please try again.'); setStep('details'); }
@@ -494,7 +489,6 @@ const ProductCatalog = ({ onSelect, wishlist, onToggleWishlist, reviews }: { onS
                 <p className="text-[9px] uppercase tracking-[0.2em] text-brand-gold font-bold mb-1">{product.category}</p>
                 <h3 className="serif text-xl text-brand-charcoal mb-1">{product.name}</h3>
                 <p className="text-sm text-brand-charcoal/80 font-medium">{product.price} <span className="text-brand-charcoal/40">/ {product.priceINR}</span></p>
-                {/* Rating badge on card */}
                 <div className="flex justify-center"><RatingBadge productId={product.id} reviews={reviews}/></div>
               </div>
             </motion.div>
@@ -554,11 +548,15 @@ const FloatingButtons = () => {
 
 // ─── Main App ─────────────────────────────────────────────────────────────
 export default function App() {
+  const { user } = useAuth();
+
   const [cartOpen, setCartOpen]             = useState(false);
   const [checkoutOpen, setCheckoutOpen]     = useState(false);
   const [wishlistOpen, setWishlistOpen]     = useState(false);
   const [ordersOpen, setOrdersOpen]         = useState(false);
   const [adminOpen, setAdminOpen]           = useState(false);
+  const [authOpen, setAuthOpen]             = useState(false);
+  const [dashboardOpen, setDashboardOpen]   = useState(false);
   const [cart, setCart]                     = useState<CartItem[]>(()=>LS.get('shakya_cart_v1',[]));
   const [wishlist, setWishlist]             = useState<string[]>(()=>LS.get('shakya_wishlist_v1',[]));
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>(()=>LS.get('shakya_recent_v1',[]));
@@ -575,12 +573,12 @@ export default function App() {
   const openProduct = useCallback((p: Product)=>{
     setSelectedProduct(p);
     setRecentlyViewed(prev=>[p,...prev.filter(r=>r.id!==p.id)].slice(0,8));
-    analytics.viewProduct(p); // track
+    analytics.viewProduct(p);
   },[]);
 
   const addToCart = useCallback((p: Product, size: string, color: string)=>{
     setCart(prev=>{const existing=prev.find(i=>i.product.id===p.id&&i.selectedSize===size&&i.selectedColor===color);if(existing)return prev.map(i=>i.product.id===p.id&&i.selectedSize===size&&i.selectedColor===color?{...i,qty:i.qty+1}:i);return[...prev,{product:p,qty:1,selectedSize:size,selectedColor:color}];});
-    analytics.addToCart(p, size, color); // track
+    analytics.addToCart(p, size, color);
   },[]);
 
   const addBundleToCart = useCallback((bundle: Bundle)=>{
@@ -604,7 +602,11 @@ export default function App() {
     setOrders(prev=>[...prev,order]);
     setCart([]);
     setCheckoutOpen(false);
-  },[]);
+    // Save to Firestore if user is logged in
+    if (user) {
+      orderService.save({ ...order, uid: user.uid } as Parameters<typeof orderService.save>[0]);
+    }
+  },[user]);
 
   const refreshOrderStatus = useCallback(async(orderId:string)=>{
     try{const res=await fetch(`/api/order-status/${orderId}`);const data=await res.json() as {status:string};setOrders(prev=>prev.map(o=>o.id===orderId?{...o,status:data.status as Order['status']}:o));}
@@ -628,6 +630,8 @@ export default function App() {
           onOpenWishlist={()=>setWishlistOpen(true)} wishlistCount={wishlist.length}
           onOpenOrders={()=>setOrdersOpen(true)} ordersCount={orders.length}
           onOpenAdmin={()=>setAdminOpen(true)}
+          onOpenAuth={()=>setAuthOpen(true)}
+          onOpenDashboard={()=>setDashboardOpen(true)}
         />
       </div>
 
@@ -646,6 +650,8 @@ export default function App() {
       <AnimatePresence>{wishlistOpen&&<WishlistDrawer wishlist={wishlistProducts} onClose={()=>setWishlistOpen(false)} onRemove={toggleWishlist} onSelect={openProduct} onAddToCart={addToCart}/>}</AnimatePresence>
       <AnimatePresence>{ordersOpen&&<OrdersDrawer orders={orders} onClose={()=>setOrdersOpen(false)} onRefreshStatus={refreshOrderStatus}/>}</AnimatePresence>
       <AnimatePresence>{adminOpen&&<AdminDashboard onClose={()=>setAdminOpen(false)}/>}</AnimatePresence>
+      <AnimatePresence>{authOpen&&<AuthModal onClose={()=>setAuthOpen(false)}/>}</AnimatePresence>
+      <AnimatePresence>{dashboardOpen&&<CustomerDashboard onClose={()=>setDashboardOpen(false)}/>}</AnimatePresence>
       <AnimatePresence>
         {selectedProduct&&<ProductModal product={selectedProduct} onClose={()=>setSelectedProduct(null)} onAdd={addToCart} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={toggleWishlist} reviews={reviews} onAddReview={handleAddReview}/>}
       </AnimatePresence>
