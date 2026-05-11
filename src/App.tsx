@@ -651,6 +651,7 @@ function AppContent() {
 
   const toggleWishlist = useCallback((id:string)=>{
     setWishlist(prev=>prev.includes(id)?prev.filter(w=>w!==id):[...prev,id]);
+  },[]);
 
   const addToCart = useCallback((p: Product, size: string, color: string)=>{
     setCart(prev=>{const existing=prev.find(i=>i.product.id===p.id&&i.selectedSize===size&&i.selectedColor===color);if(existing)return prev.map(i=>i.product.id===p.id&&i.selectedSize===size&&i.selectedColor===color?{...i,qty:i.qty+1}:i);return[...prev,{product:p,qty:1,selectedSize:size,selectedColor:color}];});
