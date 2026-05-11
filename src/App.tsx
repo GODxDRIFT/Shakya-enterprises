@@ -13,7 +13,7 @@ import { Hero, HeritageSection, ProcessSection, CustomSection, LookbookSection, 
 import { AdminDashboard } from './Admin';
 import { Stars, ReviewForm, ReviewList, RatingBadge, loadReviews, saveReviews, type Review } from './Reviews';
 import { analytics } from './analytics';
-import { AuthProvider, useAuth } from './AuthContext';
+import { useAuth } from './AuthContext';
 import { orderService, reviewService, type FSOrder, type FSReview } from './firebase';
 
 // ─── localStorage helpers ─────────────────────────────────────────────────
@@ -780,10 +780,4 @@ function AppContent() {
   );
 }
 
-export default function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
-}
+export default AppContent;
