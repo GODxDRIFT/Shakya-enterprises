@@ -16,7 +16,7 @@ import { analytics } from './analytics';
 import { AuthModal } from './CustomerAuth';
 import { CustomerDashboard } from './CustomerDashboard';
 import { useAuth } from './AuthContext';
-import { orderService } from './firebase';
+import { orderService, productService } from './firebase';
 
 // ─── localStorage helpers ─────────────────────────────────────────────────
 const LS = {
@@ -51,7 +51,7 @@ const loadCashfreeSDK = (): Promise<void> => new Promise((resolve, reject) => {
   s.onload = () => resolve(); s.onerror = () => reject(new Error('SDK load failed'));
   document.head.appendChild(s);
 });
-const CF_MODE = 'sandbox'; // change to 'production' when live
+const CF_MODE = 'sandbox';
 
 // ─── WhatsApp helper ──────────────────────────────────────────────────────
 const waUrl = (product: Product, size: string, color: string, qty = 1) =>
@@ -160,6 +160,8 @@ const ProductModal = ({
     setTimeout(()=>{setAddedFlash(false);onClose();},700);
   };
 
+  const allImages = (product.images && product.images.length > 0) ? product.images : [product.image].filter(Boolean);
+
   return (
     <>
       <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
@@ -167,10 +169,10 @@ const ProductModal = ({
         <motion.div initial={{y:80,opacity:0}} animate={{y:0,opacity:1}} exit={{y:80,opacity:0}} transition={{type:'spring',damping:28}} className="relative bg-white w-full max-w-4xl max-h-[92vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 shadow-2xl rounded-t-3xl sm:rounded-2xl">
           <div className="flex flex-col gap-2 p-4 bg-brand-sand/30">
             <div className="relative aspect-square overflow-hidden bg-brand-sand group cursor-zoom-in" onClick={()=>setLightboxOpen(true)}>
-              <motion.img key={activeImg} initial={{opacity:0}} animate={{opacity:1}} src={product.images[activeImg]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <motion.img key={activeImg} initial={{opacity:0}} animate={{opacity:1}} src={allImages[activeImg] || product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur-sm p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><ZoomIn size={16} className="text-brand-charcoal"/></div>
             </div>
-            {product.images.length>1 && <div className="flex gap-2 overflow-x-auto pb-1">{product.images.map((img,i)=><button key={i} onClick={()=>setActiveImg(i)} className={cn("shrink-0 w-16 h-16 overflow-hidden border-2 transition-all",activeImg===i?"border-brand-charcoal":"border-transparent opacity-60 hover:opacity-100")}><img src={img} className="w-full h-full object-cover"/></button>)}</div>}
+            {allImages.length>1 && <div className="flex gap-2 overflow-x-auto pb-1">{allImages.map((img,i)=><button key={i} onClick={()=>setActiveImg(i)} className={cn("shrink-0 w-16 h-16 overflow-hidden border-2 transition-all",activeImg===i?"border-brand-charcoal":"border-transparent opacity-60 hover:opacity-100")}><img src={img} className="w-full h-full object-cover"/></button>)}</div>}
           </div>
 
           <div className="p-6 sm:p-8 flex flex-col overflow-y-auto">
@@ -214,7 +216,7 @@ const ProductModal = ({
               ))}
             </div>
             <div className="text-sm text-brand-charcoal/70 leading-relaxed mb-5 flex-1 min-h-0 overflow-y-auto">
-              {tab==='desc' && <ul className="space-y-2">{product.details.map((d,i)=><li key={i} className="flex gap-2"><span className="text-brand-gold">•</span>{d}</li>)}</ul>}
+              {tab==='desc' && <ul className="space-y-2">{(product.details||[]).map((d,i)=><li key={i} className="flex gap-2"><span className="text-brand-gold">•</span>{d}</li>)}</ul>}
               {tab==='materials' && <p>{product.materials}</p>}
               {tab==='care' && <p>{product.care}</p>}
               {tab==='reviews' && (
@@ -233,7 +235,7 @@ const ProductModal = ({
               <div className="flex items-center border border-brand-charcoal/20">
                 <button onClick={()=>setQty(q=>Math.max(1,q-1))} className="w-9 h-9 flex items-center justify-center hover:bg-zinc-50 text-brand-charcoal text-lg">−</button>
                 <span className="w-9 text-center text-sm font-bold">{qty}</span>
-                <button onClick={()=>setQty(q=>Math.min(product.stock,q+1))} disabled={product.stock===0} className="w-9 h-9 flex items-center justify-center hover:bg-zinc-50 text-brand-charcoal text-lg disabled:opacity-30">+</button>
+                <button onClick={()=>setQty(q=>Math.min(product.stock||99,q+1))} disabled={product.stock===0} className="w-9 h-9 flex items-center justify-center hover:bg-zinc-50 text-brand-charcoal text-lg disabled:opacity-30">+</button>
               </div>
               <button onClick={handleAdd} disabled={product.stock===0} className={cn("flex-1 py-3.5 text-[11px] font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2",addedFlash?"bg-emerald-600 text-white":product.stock===0?"bg-brand-charcoal/20 text-brand-charcoal/40 cursor-not-allowed":"bg-brand-charcoal text-white hover:bg-brand-olive")}>
                 {addedFlash?<><CheckCircle2 size={14}/> Added!</>:<><ShoppingBag size={14}/> {product.stock===0?'Out of Stock':'Add to Bag'}</>}
@@ -244,7 +246,7 @@ const ProductModal = ({
           </div>
         </motion.div>
       </div>
-      <AnimatePresence>{lightboxOpen && <Lightbox images={product.images} startIndex={activeImg} onClose={()=>setLightboxOpen(false)}/>}</AnimatePresence>
+      <AnimatePresence>{lightboxOpen && <Lightbox images={allImages} startIndex={activeImg} onClose={()=>setLightboxOpen(false)}/>}</AnimatePresence>
       <AnimatePresence>{sizeGuideOpen && <SizeGuideModal category={product.category} onClose={()=>setSizeGuideOpen(false)}/>}</AnimatePresence>
     </>
   );
@@ -380,16 +382,18 @@ const OrdersDrawer = ({ orders, onClose, onRefreshStatus }: { orders: Order[]; o
 };
 
 // ─── Bundle Deals ─────────────────────────────────────────────────────────
-const BundleDeals = ({ onAddBundle }: { onAddBundle: (b: Bundle)=>void }) => {
+const BundleDeals = ({ onAddBundle, liveProducts }: { onAddBundle: (b: Bundle)=>void; liveProducts: Product[] }) => {
   const [addedId, setAddedId] = useState<string|null>(null);
-  const getBundlePrice = (b: Bundle) => { const products=b.productIds.map(id=>PRODUCTS.find(p=>p.id===id)!).filter(Boolean); const total=products.reduce((s,p)=>s+parseFloat(p.price.replace('$','')),0); return {original:total.toFixed(0),discounted:(total*(1-b.discount/100)).toFixed(0)}; };
+  // Try liveProducts first, fallback to static PRODUCTS
+  const findProduct = (id: string) => liveProducts.find(p=>p.id===id) || PRODUCTS.find(p=>p.id===id);
+  const getBundlePrice = (b: Bundle) => { const prods=b.productIds.map(id=>findProduct(id)).filter(Boolean) as Product[]; const total=prods.reduce((s,p)=>s+parseFloat(p.price.replace('$','')),0); return {original:total.toFixed(0),discounted:(total*(1-b.discount/100)).toFixed(0)}; };
   const handleAdd = (b: Bundle) => { onAddBundle(b); setAddedId(b.id); setTimeout(()=>setAddedId(null),2000); };
   return (
     <section className="py-24 px-6 md:px-12 bg-brand-charcoal text-white">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-end justify-between mb-14"><div><p className="text-brand-gold font-bold uppercase tracking-[0.2em] text-[10px] mb-3 flex items-center gap-2"><Tag size={11}/> Bundle & Save</p><h2 className="serif text-4xl md:text-5xl text-white">Curated <span className="italic text-white/50">Sets</span></h2></div><p className="hidden md:block text-white/40 text-sm max-w-xs text-right">Save up to 15% when you shop our handpicked bundles</p></div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {BUNDLES.map(bundle=>{const prices=getBundlePrice(bundle);const bProducts=bundle.productIds.map(id=>PRODUCTS.find(p=>p.id===id)!).filter(Boolean);const isAdded=addedId===bundle.id;return(
+          {BUNDLES.map(bundle=>{const prices=getBundlePrice(bundle);const bProducts=bundle.productIds.map(id=>findProduct(id)).filter(Boolean) as Product[];const isAdded=addedId===bundle.id;return(
             <motion.div key={bundle.id} whileHover={{y:-4}} className="bg-white/5 border border-white/10 hover:border-brand-gold/40 transition-all overflow-hidden group">
               <div className="relative aspect-video overflow-hidden"><img src={bundle.image} alt={bundle.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-70"/><div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"/><div className="absolute top-3 right-3 bg-brand-gold text-white text-[10px] font-bold px-3 py-1 uppercase tracking-widest">Save {bundle.discount}%</div><div className="absolute bottom-4 left-4 right-4"><h3 className="serif text-xl text-white mb-1">{bundle.name}</h3><p className="text-white/60 text-xs">{bundle.tagline}</p></div></div>
               <div className="p-5"><div className="flex -space-x-3 mb-4">{bProducts.slice(0,3).map(p=><div key={p.id} className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/10"><img src={p.image} className="w-full h-full object-cover"/></div>)}<div className="w-10 h-10 rounded-full bg-white/10 border-2 border-white/10 flex items-center justify-center text-[9px] text-white/60 font-bold">{bProducts.length} items</div></div>
@@ -445,15 +449,37 @@ const RecentlyViewed = ({ items, onSelect }: { items: Product[]; onSelect: (p: P
 };
 
 // ─── Product Catalog ──────────────────────────────────────────────────────
+// ⚡ KEY FIX: accepts `products` prop from Firestore instead of static PRODUCTS
 type SortType='default'|'low-high'|'high-low'; type PriceFilter='all'|'under30'|'30to60'|'over60';
-const ProductCatalog = ({ onSelect, wishlist, onToggleWishlist, reviews }: { onSelect: (p: Product)=>void; wishlist: string[]; onToggleWishlist: (id: string)=>void; reviews: Review[] }) => {
-  const [cat, setCat] = useState('All'); const [search, setSearch] = useState(''); const [sort, setSort] = useState<SortType>('default'); const [priceFilter, setPriceFilter] = useState<PriceFilter>('all'); const [filtersOpen, setFiltersOpen] = useState(false); const searchRef = useRef<HTMLInputElement>(null);
+const ProductCatalog = ({ onSelect, wishlist, onToggleWishlist, reviews, products }: {
+  onSelect: (p: Product)=>void;
+  wishlist: string[];
+  onToggleWishlist: (id: string)=>void;
+  reviews: Review[];
+  products: Product[]; // ← Firestore products passed from App
+}) => {
+  const [cat, setCat] = useState('All');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortType>('default');
+  const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+
   useEffect(()=>{ const h=(e:Event)=>{setSearch((e as CustomEvent).detail as string);searchRef.current?.focus();}; window.addEventListener('shakya-search',h); return ()=>window.removeEventListener('shakya-search',h); },[]);
+
   const priceNum=(p:Product)=>parseFloat(p.price.replace('$',''));
-  let filtered=PRODUCTS.filter(p=>cat==='All'||p.category===cat).filter(p=>!search.trim()||[p.name,p.category,p.description].some(s=>s.toLowerCase().includes(search.toLowerCase()))).filter(p=>{const pr=priceNum(p);if(priceFilter==='under30')return pr<30;if(priceFilter==='30to60')return pr>=30&&pr<=60;if(priceFilter==='over60')return pr>60;return true;});
+
+  // ⚡ Uses `products` prop (Firestore data), NOT static PRODUCTS
+  let filtered=products
+    .filter(p=>cat==='All'||p.category===cat)
+    .filter(p=>!search.trim()||[p.name,p.category,p.description||''].some(s=>s.toLowerCase().includes(search.toLowerCase())))
+    .filter(p=>{const pr=priceNum(p);if(priceFilter==='under30')return pr<30;if(priceFilter==='30to60')return pr>=30&&pr<=60;if(priceFilter==='over60')return pr>60;return true;});
+
   if(sort==='low-high')filtered=[...filtered].sort((a,b)=>priceNum(a)-priceNum(b));
   if(sort==='high-low')filtered=[...filtered].sort((a,b)=>priceNum(b)-priceNum(a));
+
   const activeFilters=(search?1:0)+(priceFilter!=='all'?1:0)+(sort!=='default'?1:0)+(cat!=='All'?1:0);
+
   return (
     <section id="collections" className="py-32 px-6 md:px-12 bg-brand-cream">
       <div className="max-w-7xl mx-auto">
@@ -565,10 +591,31 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product|null>(null);
   const [showAnnouncement, setShowAnnouncement] = useState(true);
 
+  // ⚡ KEY FIX: liveProducts starts with static PRODUCTS as fallback,
+  // then gets replaced by Firestore data on mount
+  const [liveProducts, setLiveProducts] = useState<Product[]>(PRODUCTS);
+
   useEffect(()=>{LS.set('shakya_cart_v1',cart);},[cart]);
   useEffect(()=>{LS.set('shakya_wishlist_v1',wishlist);},[wishlist]);
   useEffect(()=>{LS.set('shakya_recent_v1',recentlyViewed);},[recentlyViewed]);
   useEffect(()=>{LS.set('shakya_orders_v1',orders);},[orders]);
+
+  // ⚡ Fetch products from Firestore on mount
+  useEffect(() => {
+    productService.getAll()
+      .then(fsProducts => {
+        // Only active products visible on site
+        const active = fsProducts.filter(p => p.active !== false);
+        if (active.length > 0) {
+          // FSProduct is structurally compatible with Product
+          setLiveProducts(active as unknown as Product[]);
+        }
+        // If empty, keep static PRODUCTS as fallback
+      })
+      .catch(err => {
+        console.warn('Firestore products fetch failed, using static data:', err);
+      });
+  }, []);
 
   const openProduct = useCallback((p: Product)=>{
     setSelectedProduct(p);
@@ -582,8 +629,12 @@ export default function App() {
   },[]);
 
   const addBundleToCart = useCallback((bundle: Bundle)=>{
-    bundle.productIds.forEach(id=>{const p=PRODUCTS.find(pr=>pr.id===id);if(p)addToCart(p,p.variants.sizes[0],p.variants.colors[0].name);});
-  },[addToCart]);
+    bundle.productIds.forEach(id=>{
+      // Try liveProducts first, fallback to static
+      const p = liveProducts.find(pr=>pr.id===id) || PRODUCTS.find(pr=>pr.id===id);
+      if(p) addToCart(p,p.variants.sizes[0],p.variants.colors[0].name);
+    });
+  },[addToCart, liveProducts]);
 
   const removeFromCart = useCallback((id:string,size:string,color:string)=>{
     setCart(prev=>prev.filter(i=>!(i.product.id===id&&i.selectedSize===size&&i.selectedColor===color)));
@@ -602,7 +653,6 @@ export default function App() {
     setOrders(prev=>[...prev,order]);
     setCart([]);
     setCheckoutOpen(false);
-    // Save to Firestore if user is logged in
     if (user) {
       orderService.save({ ...order, uid: user.uid } as Parameters<typeof orderService.save>[0]);
     }
@@ -617,7 +667,10 @@ export default function App() {
     setReviews(prev=>{const exists=prev.find(x=>x.id===r.id);if(exists)return prev.map(x=>x.id===r.id?r:x);return[...prev,r];});
   },[]);
 
-  const wishlistProducts = PRODUCTS.filter(p=>wishlist.includes(p.id));
+  // Wishlist products: look in liveProducts first
+  const wishlistProducts = wishlist.map(id =>
+    liveProducts.find(p=>p.id===id) || PRODUCTS.find(p=>p.id===id)
+  ).filter(Boolean) as Product[];
 
   return (
     <div className="relative min-h-screen">
@@ -637,8 +690,15 @@ export default function App() {
 
       <main>
         <Hero/><HeritageSection/>
-        <ProductCatalog onSelect={openProduct} wishlist={wishlist} onToggleWishlist={toggleWishlist} reviews={reviews}/>
-        <BundleDeals onAddBundle={addBundleToCart}/>
+        {/* ⚡ Pass liveProducts to catalog — Firestore data shown here */}
+        <ProductCatalog
+          onSelect={openProduct}
+          wishlist={wishlist}
+          onToggleWishlist={toggleWishlist}
+          reviews={reviews}
+          products={liveProducts}
+        />
+        <BundleDeals onAddBundle={addBundleToCart} liveProducts={liveProducts}/>
         <RecentlyViewed items={recentlyViewed} onSelect={openProduct}/>
         <LookbookSection/><ProcessSection/><CustomSection/><TestimonialsSection/><FAQSection/><ContactSection/>
       </main>
@@ -658,3 +718,4 @@ export default function App() {
     </div>
   );
 }
+
