@@ -661,7 +661,10 @@ const OrdersDrawer = ({ orders, onClose, onRefreshStatus }: { orders: Order[]; o
     <div className="fixed inset-0 z-[100] flex items-center justify-end">
       <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={onClose} className="absolute inset-0 bg-brand-charcoal/40 backdrop-blur-sm cursor-pointer"/>
       <motion.div initial={{x:'100%'}} animate={{x:0}} exit={{x:'100%'}} transition={{type:'tween',duration:0.4}} className="relative w-full max-w-md h-full bg-brand-cream shadow-2xl flex flex-col">
-        <div className="p-8 border-b border-brand-charcoal/5 flex items-center justify-between bg-white"><div className="flex items-center gap-3"><Package size={20} className="text-brand-gold"/><h2 className="serif text-2xl text-brand-charcoal">My Orders ({orders.length})</h2></div><button onClick={onClose} className="text-brand-charcoal/50 hover:text-brand-charcoal"><X size={24} strokeWidth={1}/></button></div>
+        <button onClick={onOpenOrders} className="relative hover:text-brand-gold transition-colors hidden sm:block" title="My Orders">
+          <Package size={20} strokeWidth={1.5} />
+          {ordersCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-brand-gold text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{ordersCount}</span>}
+        </button></div>
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {orders.length===0 ? <div className="text-center py-20"><Package size={40} className="text-brand-charcoal/10 mx-auto mb-4"/><p className="serif text-xl text-brand-charcoal/40 italic">No orders yet</p><a href="#collections" onClick={onClose} className="text-[11px] uppercase tracking-widest text-brand-gold font-bold mt-4 inline-block hover:underline">Start Shopping</a></div>
             : [...orders].reverse().map(o=>(
