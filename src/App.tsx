@@ -3,7 +3,7 @@ import {
   ShoppingBag, X, Globe, ShieldCheck, MessageCircle, ChevronUp,
   ZoomIn, ChevronLeft, ChevronRight, CheckCircle2, AlertCircle, XCircle,
   Heart, Search, SlidersHorizontal, ArrowUpDown, Clock, Ruler,
-  MapPin, Truck, Package, Tag,
+  MapPin, Truck, Package, Tag, LogIn, Plus,
 } from 'lucide-react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from './lib/utils';
@@ -16,7 +16,7 @@ import { analytics } from './analytics';
 import { AuthModal } from './CustomerAuth';
 import { CustomerDashboard } from './CustomerDashboard';
 import { useAuth } from './AuthContext';
-import { orderService, productService } from './firebase';
+import { orderService, productService, userService } from './firebase';
 
 // ─── localStorage helpers ─────────────────────────────────────────────────
 const LS = {
@@ -146,6 +146,7 @@ const ProductModal = ({
 
   const productReviews = reviews.filter(r => r.productId === product.id);
   const avgRating = productReviews.length ? productReviews.reduce((s,r)=>s+r.rating,0)/productReviews.length : 0;
+  const allImages = (product.images && product.images.length > 0) ? product.images : [product.image].filter(Boolean);
 
   const handleHelpful = (reviewId: string) => {
     const updated = reviews.map(r => r.id===reviewId ? {...r, helpful: r.helpful+1} : r);
@@ -160,8 +161,6 @@ const ProductModal = ({
     setTimeout(()=>{setAddedFlash(false);onClose();},700);
   };
 
-  const allImages = (product.images && product.images.length > 0) ? product.images : [product.image].filter(Boolean);
-
   return (
     <>
       <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
@@ -169,7 +168,7 @@ const ProductModal = ({
         <motion.div initial={{y:80,opacity:0}} animate={{y:0,opacity:1}} exit={{y:80,opacity:0}} transition={{type:'spring',damping:28}} className="relative bg-white w-full max-w-4xl max-h-[92vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 shadow-2xl rounded-t-3xl sm:rounded-2xl">
           <div className="flex flex-col gap-2 p-4 bg-brand-sand/30">
             <div className="relative aspect-square overflow-hidden bg-brand-sand group cursor-zoom-in" onClick={()=>setLightboxOpen(true)}>
-              <motion.img key={activeImg} initial={{opacity:0}} animate={{opacity:1}} src={allImages[activeImg] || product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+              <motion.img key={activeImg} initial={{opacity:0}} animate={{opacity:1}} src={allImages[activeImg]||product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               <div className="absolute bottom-3 right-3 bg-white/80 backdrop-blur-sm p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><ZoomIn size={16} className="text-brand-charcoal"/></div>
             </div>
             {allImages.length>1 && <div className="flex gap-2 overflow-x-auto pb-1">{allImages.map((img,i)=><button key={i} onClick={()=>setActiveImg(i)} className={cn("shrink-0 w-16 h-16 overflow-hidden border-2 transition-all",activeImg===i?"border-brand-charcoal":"border-transparent opacity-60 hover:opacity-100")}><img src={img} className="w-full h-full object-cover"/></button>)}</div>}
@@ -222,11 +221,7 @@ const ProductModal = ({
               {tab==='reviews' && (
                 <div>
                   <ReviewList productId={product.id} reviews={reviews} onHelpful={handleHelpful} />
-                  <ReviewForm productId={product.id} onSubmit={r => {
-                    const all = [...reviews, r];
-                    saveReviews(all);
-                    onAddReview(r);
-                  }} />
+                  <ReviewForm productId={product.id} onSubmit={r => { const all=[...reviews,r]; saveReviews(all); onAddReview(r); }} />
                 </div>
               )}
             </div>
@@ -252,88 +247,399 @@ const ProductModal = ({
   );
 };
 
-// ─── Checkout Modal ───────────────────────────────────────────────────────
-const Field = ({ label, value, onChange, placeholder, type='text' }: { label: string; value: string; onChange: (v: string)=>void; placeholder?: string; type?: string }) => (
-  <div><label className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/50 block mb-1.5">{label}</label><input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className="w-full border-b border-brand-charcoal/20 pb-2 bg-transparent text-sm focus:outline-none focus:border-brand-olive transition-colors placeholder:text-brand-charcoal/20"/></div>
+// ─── Checkout Field ───────────────────────────────────────────────────────
+const CField = ({ label, value, onChange, placeholder, type='text', disabled=false }: { label: string; value: string; onChange?: (v: string)=>void; placeholder?: string; type?: string; disabled?: boolean }) => (
+  <div>
+    <label className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/50 block mb-1.5">{label}</label>
+    <input
+      type={type} value={value}
+      onChange={e=>onChange?.(e.target.value)}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={cn(
+        "w-full border-b pb-2 bg-transparent text-sm focus:outline-none transition-colors placeholder:text-brand-charcoal/20",
+        disabled ? "border-brand-charcoal/10 text-brand-charcoal/40 cursor-not-allowed" : "border-brand-charcoal/20 focus:border-brand-olive"
+      )}
+    />
+  </div>
 );
 
-const CheckoutModal = ({ cart, onClose, onSuccess }: { cart: CartItem[]; onClose: ()=>void; onSuccess: (order: Order)=>void }) => {
+// ─── Checkout Modal ───────────────────────────────────────────────────────
+const CheckoutModal = ({ cart, onClose, onSuccess, onOpenAuth }: {
+  cart: CartItem[];
+  onClose: ()=>void;
+  onSuccess: (order: Order)=>void;
+  onOpenAuth: ()=>void;
+}) => {
+  const { user, profile, refreshProfile } = useAuth();
   const INR_RATE = 83.5;
   const totalUSD = cart.reduce((s,i)=>s+parseFloat(i.product.price.replace('$',''))*i.qty,0);
   const totalINR = Math.round(totalUSD*INR_RATE);
+
   const [step, setStep] = useState<'details'|'processing'|'success'>('details');
   const [errorMsg, setErrorMsg] = useState('');
-  const [form, setForm] = useState({name:'',email:'',phone:'',address:'',city:'',state:'',pincode:'',country:'India'});
+  const [saveAddress, setSaveAddress] = useState(false);
+
+  // Address mode: 'saved' = use saved address, 'new' = enter new
+  const savedAddresses = profile?.addresses || [];
+  const defaultAddr = savedAddresses.find(a=>a.isDefault) || savedAddresses[0];
+  const [addressMode, setAddressMode] = useState<'saved'|'new'>(defaultAddr ? 'saved' : 'new');
+  const [selectedAddressId, setSelectedAddressId] = useState(defaultAddr?.id || '');
+
+  const [form, setForm] = useState({
+    name: '', email: '', phone: '',
+    address: '', city: '', state: '', pincode: '', country: 'India',
+  });
   const set = (k: string, v: string) => setForm(p=>({...p,[k]:v}));
 
+  // Pre-fill contact info from Firebase profile
+  useEffect(() => {
+    if (user) {
+      setForm(prev => ({
+        ...prev,
+        name: profile?.name || user.displayName || prev.name,
+        email: user.email || prev.email,
+        phone: profile?.phone || prev.phone,
+      }));
+    }
+  }, [user, profile]);
+
+  // Pre-fill address when saved address selected
+  useEffect(() => {
+    if (addressMode === 'saved' && selectedAddressId) {
+      const addr = savedAddresses.find(a => a.id === selectedAddressId);
+      if (addr) {
+        setForm(prev => ({
+          ...prev,
+          address: addr.line1,
+          city: addr.city,
+          state: addr.state,
+          pincode: addr.pincode,
+          country: addr.country,
+        }));
+      }
+    }
+    if (addressMode === 'new') {
+      setForm(prev => ({ ...prev, address: '', city: '', state: '', pincode: '', country: 'India' }));
+    }
+  }, [addressMode, selectedAddressId]);
+
   const handlePay = async () => {
-    if (!form.name||!form.email||!form.phone||!form.address||!form.city||!form.pincode){setErrorMsg('Please fill all required fields.');return;}
-    if (!/^\d{10}$/.test(form.phone)){setErrorMsg('Enter a valid 10-digit phone number.');return;}
-    if (!/\S+@\S+\.\S+/.test(form.email)){setErrorMsg('Enter a valid email address.');return;}
+    if (!form.name||!form.email||!form.phone||!form.address||!form.city||!form.pincode) {
+      setErrorMsg('Please fill all required fields.'); return;
+    }
+    if (!/^\d{10}$/.test(form.phone)) { setErrorMsg('Enter a valid 10-digit phone number.'); return; }
+    if (!/\S+@\S+\.\S+/.test(form.email)) { setErrorMsg('Enter a valid email address.'); return; }
+
     setErrorMsg(''); setStep('processing');
     analytics.beginCheckout(totalUSD, cart.reduce((s,i)=>s+i.qty,0));
+
     try {
       await loadCashfreeSDK();
-      const orderId=`SHAKYA_${Date.now()}`;
-      const res=await fetch('/api/create-order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId,amountINR:totalINR,customer:{name:form.name,email:form.email,phone:form.phone}})});
-      const data=await res.json() as {sessionId?:string;cfOrderId?:string;error?:string};
-      if(!res.ok||!data.sessionId) throw new Error(data.error||'Failed to create payment order');
-      const cashfree=await window.Cashfree!({mode:CF_MODE});
-      const result=await cashfree.checkout({paymentSessionId:data.sessionId,redirectTarget:'_modal'});
-      if(result.error) throw new Error(result.error.message);
-      const order:Order={id:orderId,cfOrderId:data.cfOrderId,date:new Date().toISOString(),items:cart,customer:{name:form.name,email:form.email,phone:form.phone},shipping:{address:form.address,city:form.city,state:form.state,pincode:form.pincode,country:form.country},totalINR,totalUSD:`$${totalUSD.toFixed(2)}`,status:'PAID'};
+      const orderId = `SHAKYA_${Date.now()}`;
+      const res = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ orderId, amountINR: totalINR, customer: { name: form.name, email: form.email, phone: form.phone } }),
+      });
+      const data = await res.json() as {sessionId?:string;cfOrderId?:string;error?:string};
+      if (!res.ok || !data.sessionId) throw new Error(data.error||'Failed to create payment order');
+
+      const cashfree = await window.Cashfree!({mode: CF_MODE});
+      const result = await cashfree.checkout({ paymentSessionId: data.sessionId, redirectTarget: '_modal' });
+      if (result.error) throw new Error(result.error.message);
+
+      const order: Order = {
+        id: orderId, cfOrderId: data.cfOrderId,
+        date: new Date().toISOString(),
+        items: cart,
+        customer: { name: form.name, email: form.email, phone: form.phone },
+        shipping: { address: form.address, city: form.city, state: form.state, pincode: form.pincode, country: form.country },
+        totalINR, totalUSD: `$${totalUSD.toFixed(2)}`, status: 'PAID',
+      };
+
+      // Save new address to profile if user opted in
+      if (saveAddress && addressMode === 'new' && user) {
+        const newAddr = {
+          id: `addr_${Date.now()}`,
+          label: 'Home',
+          line1: form.address,
+          city: form.city,
+          state: form.state,
+          pincode: form.pincode,
+          country: form.country,
+          isDefault: savedAddresses.length === 0,
+        };
+        const updated = [...savedAddresses, newAddr];
+        await userService.update(user.uid, { addresses: updated });
+        await refreshProfile();
+      }
+
       analytics.purchase(orderId, totalINR, `$${totalUSD.toFixed(2)}`);
-      onSuccess(order); setStep('success');
-    } catch(err:any){ setErrorMsg(err.message||'Payment failed. Please try again.'); setStep('details'); }
+      onSuccess(order);
+      setStep('success');
+    } catch(err: any) {
+      setErrorMsg(err.message||'Payment failed. Please try again.');
+      setStep('details');
+    }
   };
 
+  const backdrop = (
+    <motion.div
+      initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+      onClick={step==='details'?onClose:undefined}
+      className="absolute inset-0 bg-brand-charcoal/70 backdrop-blur-sm cursor-pointer"
+    />
+  );
+
+  // ── Login Gate ────────────────────────────────────────────────────────
+  if (!user) {
+    return (
+      <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+        {backdrop}
+        <motion.div initial={{y:60,opacity:0}} animate={{y:0,opacity:1}} exit={{y:60,opacity:0}} transition={{type:'spring',damping:28}} className="relative bg-white w-full max-w-md shadow-2xl rounded-t-3xl sm:rounded-2xl overflow-hidden">
+          <div className="p-10 text-center">
+            <button onClick={onClose} className="absolute top-4 right-4 text-brand-charcoal/30 hover:text-brand-charcoal"><X size={18}/></button>
+            <div className="w-20 h-20 bg-brand-gold/10 rounded-full flex items-center justify-center mx-auto mb-5">
+              <LogIn size={32} className="text-brand-gold"/>
+            </div>
+            <h2 className="serif text-2xl text-brand-charcoal mb-2">Login to Checkout</h2>
+            <p className="text-brand-charcoal/60 text-sm mb-2">Sign in to complete your purchase and track your orders.</p>
+            <div className="bg-brand-cream rounded-lg p-4 mb-6 text-left">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/40 mb-2">Your cart ({cart.reduce((s,i)=>s+i.qty,0)} items)</p>
+              {cart.slice(0,3).map(item => (
+                <div key={item.product.id} className="flex items-center gap-2 py-1">
+                  <img src={item.product.image} className="w-8 h-8 object-cover rounded"/>
+                  <span className="text-xs text-brand-charcoal/70 flex-1 truncate">{item.product.name}</span>
+                  <span className="text-xs font-bold text-brand-charcoal">×{item.qty}</span>
+                </div>
+              ))}
+              {cart.length > 3 && <p className="text-[10px] text-brand-charcoal/40 mt-1">+{cart.length-3} more items</p>}
+              <div className="border-t border-brand-charcoal/10 mt-2 pt-2 flex justify-between">
+                <span className="text-xs font-bold text-brand-charcoal/60">Total</span>
+                <span className="text-sm font-bold text-brand-charcoal">₹{totalINR.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => { onClose(); onOpenAuth(); }}
+              className="w-full bg-brand-charcoal text-white py-4 text-[11px] font-bold uppercase tracking-widest hover:bg-brand-olive transition-colors flex items-center justify-center gap-2 mb-3"
+            >
+              <LogIn size={14}/> Sign In / Create Account
+            </button>
+            <button onClick={onClose} className="text-[10px] text-brand-charcoal/40 hover:text-brand-charcoal uppercase tracking-widest font-bold">
+              Continue Browsing
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ── Full Checkout ─────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
-      <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={step==='details'?onClose:undefined} className="absolute inset-0 bg-brand-charcoal/70 backdrop-blur-sm cursor-pointer"/>
+      {backdrop}
       <motion.div initial={{y:60,opacity:0}} animate={{y:0,opacity:1}} exit={{y:60,opacity:0}} transition={{type:'spring',damping:28}} className="relative bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl rounded-t-3xl sm:rounded-2xl">
+
+        {/* ── Success ── */}
         {step==='success' && (
           <div className="p-12 text-center">
-            <motion.div initial={{scale:0}} animate={{scale:1}} transition={{type:'spring',damping:12}} className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 size={40} className="text-emerald-500"/></motion.div>
+            <motion.div initial={{scale:0}} animate={{scale:1}} transition={{type:'spring',damping:12}} className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 size={40} className="text-emerald-500"/>
+            </motion.div>
             <h2 className="serif text-3xl text-brand-charcoal mb-3">Order Placed! 🎉</h2>
             <p className="text-brand-charcoal/60 mb-2">Thank you, <strong>{form.name}</strong>!</p>
-            <p className="text-brand-charcoal/50 text-sm mb-6">Confirmation sent to <strong>{form.email}</strong></p>
-            <div className="bg-brand-cream p-4 rounded-lg text-left mb-6 text-sm text-brand-charcoal/70">
-              <p><span className="font-bold text-brand-charcoal">Amount paid:</span> ₹{totalINR.toLocaleString('en-IN')} ({`$${totalUSD.toFixed(2)}`})</p>
-              <p className="mt-1"><span className="font-bold text-brand-charcoal">Estimated delivery:</span> 7–14 business days</p>
+            <p className="text-brand-charcoal/50 text-sm mb-6">A confirmation has been linked to your account.</p>
+            <div className="bg-brand-cream p-4 rounded-lg text-left mb-6 text-sm text-brand-charcoal/70 space-y-1">
+              <p><span className="font-bold text-brand-charcoal">Amount paid:</span> ₹{totalINR.toLocaleString('en-IN')} (${totalUSD.toFixed(2)})</p>
+              <p><span className="font-bold text-brand-charcoal">Delivering to:</span> {form.city}, {form.state}</p>
+              <p><span className="font-bold text-brand-charcoal">Estimated delivery:</span> 7–14 business days</p>
             </div>
             <button onClick={onClose} className="w-full bg-brand-charcoal text-white py-4 text-[11px] font-bold uppercase tracking-widest hover:bg-brand-olive transition-colors">Continue Shopping</button>
           </div>
         )}
+
+        {/* ── Processing ── */}
         {step==='processing' && (
           <div className="p-16 text-center">
             <motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:'linear'}} className="w-14 h-14 border-4 border-brand-charcoal/20 border-t-brand-gold rounded-full mx-auto mb-6"/>
-            <p className="serif text-xl text-brand-charcoal">Opening Payment…</p>
+            <p className="serif text-xl text-brand-charcoal">Processing Payment…</p>
             <p className="text-brand-charcoal/40 text-sm mt-2">Please complete the payment in the Cashfree window</p>
           </div>
         )}
+
+        {/* ── Details Form ── */}
         {step==='details' && (
           <div className="p-8">
-            <div className="flex justify-between items-center mb-8"><div><p className="text-brand-gold text-[10px] uppercase tracking-widest font-bold mb-1">Secure Checkout</p><h2 className="serif text-2xl text-brand-charcoal">Your Details</h2></div><button onClick={onClose} className="text-brand-charcoal/40 hover:text-brand-charcoal"><X size={22}/></button></div>
-            {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3 mb-6 flex items-center gap-2"><XCircle size={14}/>{errorMsg}</div>}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5 mb-8">
-              <div className="sm:col-span-2"><p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/40 mb-4">Contact Information</p></div>
-              <Field label="Full Name *" value={form.name} onChange={v=>set('name',v)} placeholder="Rahul Sharma"/>
-              <Field label="Email *" type="email" value={form.email} onChange={v=>set('email',v)} placeholder="rahul@email.com"/>
-              <Field label="Phone * (10 digits)" type="tel" value={form.phone} onChange={v=>set('phone',v)} placeholder="9999999999"/>
-              <div className="sm:col-span-2 pt-2 border-t border-brand-charcoal/5"><p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/40 mb-4 mt-4">Delivery Address</p></div>
-              <div className="sm:col-span-2"><Field label="Address *" value={form.address} onChange={v=>set('address',v)} placeholder="House no., Street, Area"/></div>
-              <Field label="City *" value={form.city} onChange={v=>set('city',v)} placeholder="Delhi"/>
-              <Field label="State" value={form.state} onChange={v=>set('state',v)} placeholder="Delhi"/>
-              <Field label="Pincode *" value={form.pincode} onChange={v=>set('pincode',v)} placeholder="110001"/>
-              <Field label="Country" value={form.country} onChange={v=>set('country',v)} placeholder="India"/>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <p className="text-brand-gold text-[10px] uppercase tracking-widest font-bold mb-1">Secure Checkout</p>
+                <h2 className="serif text-2xl text-brand-charcoal">Your Details</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Logged in user badge */}
+                <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full">
+                  <CheckCircle2 size={12}/>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">{user.email?.split('@')[0]}</span>
+                </div>
+                <button onClick={onClose} className="text-brand-charcoal/40 hover:text-brand-charcoal"><X size={22}/></button>
+              </div>
             </div>
-            <div className="bg-brand-cream p-5 mb-6">
-              <p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/50 mb-4">Order Summary</p>
-              <div className="space-y-3 mb-4">{cart.map(item=><div key={`${item.product.id}-${item.selectedSize}-${item.selectedColor}`} className="flex justify-between text-sm"><span className="text-brand-charcoal/70">{item.product.name} <span className="text-brand-charcoal/40">({item.selectedSize}, {item.selectedColor}) ×{item.qty}</span></span><span className="font-bold text-brand-charcoal">{item.product.priceINR}</span></div>)}</div>
-              <div className="border-t border-brand-charcoal/10 pt-3 flex justify-between items-center"><span className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/50">Total</span><div className="text-right"><p className="serif text-2xl text-brand-charcoal font-bold">₹{totalINR.toLocaleString('en-IN')}</p><p className="text-[10px] text-brand-charcoal/40">≈ ${totalUSD.toFixed(2)} USD</p></div></div>
+
+            {errorMsg && (
+              <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3 mb-6 flex items-center gap-2 rounded-lg">
+                <XCircle size={14}/>{errorMsg}
+              </div>
+            )}
+
+            {/* Contact Info - pre-filled, mostly read-only */}
+            <div className="mb-6">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/40 mb-4">Contact Information</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                <CField label="Full Name *" value={form.name} onChange={v=>set('name',v)} placeholder="Your name"/>
+                <CField label="Email *" type="email" value={form.email} onChange={v=>set('email',v)} placeholder="email@example.com"/>
+                <CField label="Phone * (10 digits)" type="tel" value={form.phone} onChange={v=>set('phone',v)} placeholder="9999999999"/>
+              </div>
             </div>
-            <button onClick={handlePay} className="w-full bg-brand-gold hover:bg-brand-charcoal text-white py-5 text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-3"><ShieldCheck size={16}/> Pay ₹{totalINR.toLocaleString('en-IN')} via Cashfree</button>
-            <p className="text-center text-[10px] text-brand-charcoal/30 mt-3 uppercase tracking-widest">UPI · Cards · NetBanking · Wallets</p>
+
+            {/* Delivery Address */}
+            <div className="mb-6">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/40 mb-4">Delivery Address</p>
+
+              {/* Saved address picker */}
+              {savedAddresses.length > 0 && (
+                <div className="mb-4 space-y-2">
+                  {/* Option: Use saved address */}
+                  <div
+                    onClick={() => setAddressMode('saved')}
+                    className={cn(
+                      "border rounded-lg p-4 cursor-pointer transition-all",
+                      addressMode==='saved' ? "border-brand-gold bg-brand-gold/5" : "border-brand-charcoal/15 hover:border-brand-charcoal/30"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={cn("w-4 h-4 rounded-full border-2 flex items-center justify-center", addressMode==='saved' ? "border-brand-gold" : "border-brand-charcoal/30")}>
+                        {addressMode==='saved' && <div className="w-2 h-2 rounded-full bg-brand-gold"/>}
+                      </div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-charcoal">Use Saved Address</p>
+                    </div>
+
+                    {addressMode === 'saved' && (
+                      <div className="ml-7 space-y-2">
+                        {savedAddresses.map(addr => (
+                          <label key={addr.id} className={cn("flex items-start gap-2 cursor-pointer p-2 rounded transition-colors", selectedAddressId===addr.id ? "bg-brand-cream" : "hover:bg-brand-cream/50")}>
+                            <input
+                              type="radio"
+                              name="savedAddr"
+                              value={addr.id}
+                              checked={selectedAddressId===addr.id}
+                              onChange={() => setSelectedAddressId(addr.id)}
+                              className="mt-0.5 accent-brand-gold"
+                            />
+                            <div>
+                              {addr.label && <span className="text-[10px] font-bold uppercase tracking-widest text-brand-gold mr-2">{addr.label}</span>}
+                              {addr.isDefault && <span className="text-[9px] text-brand-charcoal/40 font-bold uppercase tracking-widest">Default</span>}
+                              <p className="text-sm text-brand-charcoal">{addr.line1}</p>
+                              <p className="text-xs text-brand-charcoal/60">{addr.city}, {addr.state} — {addr.pincode}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Option: Add new address */}
+                  <div
+                    onClick={() => setAddressMode('new')}
+                    className={cn(
+                      "border rounded-lg p-4 cursor-pointer transition-all",
+                      addressMode==='new' ? "border-brand-gold bg-brand-gold/5" : "border-brand-charcoal/15 hover:border-brand-charcoal/30"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn("w-4 h-4 rounded-full border-2 flex items-center justify-center", addressMode==='new' ? "border-brand-gold" : "border-brand-charcoal/30")}>
+                        {addressMode==='new' && <div className="w-2 h-2 rounded-full bg-brand-gold"/>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Plus size={14} className="text-brand-charcoal/50"/>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-charcoal">Add New Address</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* New address form */}
+              {addressMode === 'new' && (
+                <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                  <div className="sm:col-span-2">
+                    <CField label="Street Address *" value={form.address} onChange={v=>set('address',v)} placeholder="House no., Street, Area"/>
+                  </div>
+                  <CField label="City *" value={form.city} onChange={v=>set('city',v)} placeholder="Delhi"/>
+                  <CField label="State" value={form.state} onChange={v=>set('state',v)} placeholder="Delhi"/>
+                  <CField label="Pincode *" value={form.pincode} onChange={v=>set('pincode',v)} placeholder="110001"/>
+                  <CField label="Country" value={form.country} onChange={v=>set('country',v)} placeholder="India"/>
+
+                  {/* Save address checkbox */}
+                  <div className="sm:col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveAddress}
+                        onChange={e=>setSaveAddress(e.target.checked)}
+                        className="w-4 h-4 accent-brand-gold"
+                      />
+                      <span className="text-[11px] text-brand-charcoal/60 font-bold uppercase tracking-wider">Save this address to my profile</span>
+                    </label>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Show selected address summary for saved mode */}
+              {addressMode === 'saved' && selectedAddressId && (
+                <motion.div initial={{opacity:0}} animate={{opacity:1}} className="mt-3 bg-brand-cream rounded-lg p-3 text-sm text-brand-charcoal/70">
+                  <p className="font-bold text-brand-charcoal text-[11px] uppercase tracking-widest mb-1">Delivering to:</p>
+                  <p>{form.address}, {form.city}, {form.state} — {form.pincode}</p>
+                </motion.div>
+              )}
+            </div>
+
+            {/* Order Summary */}
+            <div className="bg-brand-cream p-5 mb-6 rounded-lg">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/50 mb-4">Order Summary ({cart.reduce((s,i)=>s+i.qty,0)} items)</p>
+              <div className="space-y-3 mb-4">
+                {cart.map(item=>(
+                  <div key={`${item.product.id}-${item.selectedSize}-${item.selectedColor}`} className="flex items-center gap-3 text-sm">
+                    <img src={item.product.image} className="w-10 h-10 object-cover rounded shrink-0"/>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-brand-charcoal truncate">{item.product.name}</p>
+                      <p className="text-brand-charcoal/40 text-[10px]">{item.selectedSize} · {item.selectedColor} · ×{item.qty}</p>
+                    </div>
+                    <span className="font-bold text-brand-charcoal shrink-0">₹{(parseFloat(item.product.priceINR.replace('₹','').replace(',',''))*item.qty).toLocaleString('en-IN')}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-brand-charcoal/10 pt-3 space-y-1">
+                <div className="flex justify-between text-sm text-brand-charcoal/60">
+                  <span>Subtotal</span><span>₹{totalINR.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between text-sm text-brand-charcoal/60">
+                  <span>Shipping</span><span className="text-emerald-600 font-bold">Free</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-brand-charcoal/10">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-brand-charcoal/50">Total</span>
+                  <div className="text-right">
+                    <p className="serif text-2xl text-brand-charcoal font-bold">₹{totalINR.toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-brand-charcoal/40">≈ ${totalUSD.toFixed(2)} USD</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button onClick={handlePay} className="w-full bg-brand-gold hover:bg-brand-charcoal text-white py-5 text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-3">
+              <ShieldCheck size={16}/> Pay ₹{totalINR.toLocaleString('en-IN')} via Cashfree
+            </button>
+            <p className="text-center text-[10px] text-brand-charcoal/30 mt-3 uppercase tracking-widest">UPI · Cards · NetBanking · Wallets · Secured by SSL</p>
           </div>
         )}
       </motion.div>
@@ -359,9 +665,9 @@ const OrdersDrawer = ({ orders, onClose, onRefreshStatus }: { orders: Order[]; o
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {orders.length===0 ? <div className="text-center py-20"><Package size={40} className="text-brand-charcoal/10 mx-auto mb-4"/><p className="serif text-xl text-brand-charcoal/40 italic">No orders yet</p><a href="#collections" onClick={onClose} className="text-[11px] uppercase tracking-widest text-brand-gold font-bold mt-4 inline-block hover:underline">Start Shopping</a></div>
             : [...orders].reverse().map(o=>(
-              <div key={o.id} className="bg-white border border-brand-charcoal/8 p-5">
+              <div key={o.id} className="bg-white border border-brand-charcoal/8 p-5 rounded-lg">
                 <div className="flex justify-between items-start mb-3"><div><p className="text-[9px] uppercase tracking-widest text-brand-charcoal/40 font-bold">Order ID</p><p className="text-xs font-mono text-brand-charcoal font-bold">{o.id}</p></div><OrderStatusBadge status={o.status}/></div>
-                <div className="flex gap-2 mb-3 overflow-x-auto pb-1">{o.items.map(item=><div key={`${item.product.id}-${item.selectedSize}`} className="shrink-0 w-12 h-12 overflow-hidden bg-brand-sand"><img src={item.product.image} className="w-full h-full object-cover"/></div>)}</div>
+                <div className="flex gap-2 mb-3 overflow-x-auto pb-1">{o.items.map(item=><div key={`${item.product.id}-${item.selectedSize}`} className="shrink-0 w-12 h-12 overflow-hidden bg-brand-sand rounded"><img src={item.product.image} className="w-full h-full object-cover"/></div>)}</div>
                 <div className="text-xs text-brand-charcoal/50 space-y-1 mb-3">
                   <p><span className="font-bold text-brand-charcoal/70">Date:</span> {new Date(o.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</p>
                   <p><span className="font-bold text-brand-charcoal/70">Amount:</span> ₹{o.totalINR.toLocaleString('en-IN')} ({o.totalUSD})</p>
@@ -371,7 +677,7 @@ const OrdersDrawer = ({ orders, onClose, onRefreshStatus }: { orders: Order[]; o
                   <button onClick={()=>handleRefresh(o.id)} disabled={refreshing===o.id} className="flex-1 py-2 border border-brand-charcoal/20 text-[9px] font-bold uppercase tracking-widest text-brand-charcoal hover:bg-brand-cream transition-colors flex items-center justify-center gap-1 disabled:opacity-50">
                     {refreshing===o.id?<motion.div animate={{rotate:360}} transition={{duration:0.8,repeat:Infinity}} className="w-3 h-3 border-2 border-brand-charcoal/30 border-t-brand-charcoal rounded-full"/>:'↻ Refresh Status'}
                   </button>
-                  <a href={`https://wa.me/918750590574?text=${encodeURIComponent(`Hi! Track my order: ${o.id}`)}`} target="_blank" rel="noopener noreferrer" className="py-2 px-3 bg-green-500 hover:bg-green-600 text-white text-[9px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1"><MessageCircle size={10}/> Track</a>
+                  <a href={`https://wa.me/918750590574?text=${encodeURIComponent(`Hi! Track my order: ${o.id}`)}`} target="_blank" rel="noopener noreferrer" className="py-2 px-3 bg-green-500 hover:bg-green-600 text-white text-[9px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 rounded"><MessageCircle size={10}/> Track</a>
                 </div>
               </div>
             ))}
@@ -384,7 +690,6 @@ const OrdersDrawer = ({ orders, onClose, onRefreshStatus }: { orders: Order[]; o
 // ─── Bundle Deals ─────────────────────────────────────────────────────────
 const BundleDeals = ({ onAddBundle, liveProducts }: { onAddBundle: (b: Bundle)=>void; liveProducts: Product[] }) => {
   const [addedId, setAddedId] = useState<string|null>(null);
-  // Try liveProducts first, fallback to static PRODUCTS
   const findProduct = (id: string) => liveProducts.find(p=>p.id===id) || PRODUCTS.find(p=>p.id===id);
   const getBundlePrice = (b: Bundle) => { const prods=b.productIds.map(id=>findProduct(id)).filter(Boolean) as Product[]; const total=prods.reduce((s,p)=>s+parseFloat(p.price.replace('$','')),0); return {original:total.toFixed(0),discounted:(total*(1-b.discount/100)).toFixed(0)}; };
   const handleAdd = (b: Bundle) => { onAddBundle(b); setAddedId(b.id); setTimeout(()=>setAddedId(null),2000); };
@@ -417,13 +722,12 @@ const WishlistDrawer = ({ wishlist, onClose, onRemove, onSelect, onAddToCart }: 
       <div className="flex-1 overflow-y-auto p-8 space-y-6">
         {wishlist.length===0?<div className="text-center py-20"><Heart size={40} className="text-brand-charcoal/10 mx-auto mb-4"/><p className="serif text-xl text-brand-charcoal/40 italic">Nothing saved yet</p><a href="#collections" onClick={onClose} className="text-[11px] uppercase tracking-widest text-brand-gold font-bold mt-4 inline-block hover:underline">Browse Collection</a></div>
           :wishlist.map(product=>(
-            <div key={product.id} className="flex gap-4 bg-white p-4 group">
-              <div className="w-20 h-24 overflow-hidden shrink-0 cursor-pointer" onClick={()=>{onSelect(product);onClose();}}><img src={product.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/></div>
+            <div key={product.id} className="flex gap-4 bg-white p-4 group rounded-lg">
+              <div className="w-20 h-24 overflow-hidden shrink-0 cursor-pointer rounded" onClick={()=>{onSelect(product);onClose();}}><img src={product.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/></div>
               <div className="flex-1 flex flex-col justify-between">
                 <div><p className="text-[9px] uppercase tracking-wider text-brand-gold font-bold mb-0.5">{product.category}</p><h3 className="serif text-base text-brand-charcoal leading-tight cursor-pointer hover:text-brand-olive transition-colors" onClick={()=>{onSelect(product);onClose();}}>{product.name}</h3><p className="text-sm font-bold text-brand-charcoal/70 mt-1">{product.price}</p></div>
                 <div className="flex gap-2 mt-2">
                   <button onClick={()=>onAddToCart(product,product.variants.sizes[0],product.variants.colors[0].name)} disabled={product.stock===0} className={cn("flex-1 py-2 text-[9px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-1",product.stock===0?"bg-zinc-100 text-zinc-400 cursor-not-allowed":"bg-brand-charcoal text-white hover:bg-brand-olive")}><ShoppingBag size={10}/> {product.stock===0?'Out of Stock':'Add to Bag'}</button>
-                  <a href={waUrl(product,product.variants.sizes[0],product.variants.colors[0].name)} target="_blank" rel="noopener noreferrer" className="py-2 px-3 bg-green-500 hover:bg-green-600 text-white text-[9px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1"><MessageCircle size={10}/></a>
                   <button onClick={()=>onRemove(product.id)} className="text-[9px] text-red-400 hover:text-red-600 uppercase tracking-widest px-2">✕</button>
                 </div>
               </div>
@@ -441,7 +745,7 @@ const RecentlyViewed = ({ items, onSelect }: { items: Product[]; onSelect: (p: P
     <section className="py-20 px-6 md:px-12 bg-white border-t border-brand-charcoal/5">
       <div className="max-w-7xl mx-auto"><div className="flex items-center gap-3 mb-10"><Clock size={16} className="text-brand-gold"/><h2 className="serif text-2xl text-brand-charcoal">Recently <span className="italic text-brand-olive">Viewed</span></h2></div>
         <div className="flex gap-6 overflow-x-auto pb-4">
-          {items.map(product=><div key={product.id} className="shrink-0 w-44 cursor-pointer group" onClick={()=>onSelect(product)}><div className="aspect-[3/4] overflow-hidden bg-brand-sand mb-3"><img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/></div><p className="text-[9px] uppercase tracking-wider text-brand-gold font-bold mb-0.5">{product.category}</p><h4 className="serif text-sm text-brand-charcoal leading-tight mb-1">{product.name}</h4><p className="text-xs font-bold text-brand-charcoal/60">{product.price}</p></div>)}
+          {items.map(product=><div key={product.id} className="shrink-0 w-44 cursor-pointer group" onClick={()=>onSelect(product)}><div className="aspect-[3/4] overflow-hidden bg-brand-sand mb-3 rounded-lg"><img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"/></div><p className="text-[9px] uppercase tracking-wider text-brand-gold font-bold mb-0.5">{product.category}</p><h4 className="serif text-sm text-brand-charcoal leading-tight mb-1">{product.name}</h4><p className="text-xs font-bold text-brand-charcoal/60">{product.price}</p></div>)}
         </div>
       </div>
     </section>
@@ -449,37 +753,17 @@ const RecentlyViewed = ({ items, onSelect }: { items: Product[]; onSelect: (p: P
 };
 
 // ─── Product Catalog ──────────────────────────────────────────────────────
-// ⚡ KEY FIX: accepts `products` prop from Firestore instead of static PRODUCTS
 type SortType='default'|'low-high'|'high-low'; type PriceFilter='all'|'under30'|'30to60'|'over60';
 const ProductCatalog = ({ onSelect, wishlist, onToggleWishlist, reviews, products }: {
-  onSelect: (p: Product)=>void;
-  wishlist: string[];
-  onToggleWishlist: (id: string)=>void;
-  reviews: Review[];
-  products: Product[]; // ← Firestore products passed from App
+  onSelect: (p: Product)=>void; wishlist: string[]; onToggleWishlist: (id: string)=>void; reviews: Review[]; products: Product[];
 }) => {
-  const [cat, setCat] = useState('All');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortType>('default');
-  const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
-
+  const [cat, setCat] = useState('All'); const [search, setSearch] = useState(''); const [sort, setSort] = useState<SortType>('default'); const [priceFilter, setPriceFilter] = useState<PriceFilter>('all'); const [filtersOpen, setFiltersOpen] = useState(false); const searchRef = useRef<HTMLInputElement>(null);
   useEffect(()=>{ const h=(e:Event)=>{setSearch((e as CustomEvent).detail as string);searchRef.current?.focus();}; window.addEventListener('shakya-search',h); return ()=>window.removeEventListener('shakya-search',h); },[]);
-
   const priceNum=(p:Product)=>parseFloat(p.price.replace('$',''));
-
-  // ⚡ Uses `products` prop (Firestore data), NOT static PRODUCTS
-  let filtered=products
-    .filter(p=>cat==='All'||p.category===cat)
-    .filter(p=>!search.trim()||[p.name,p.category,p.description||''].some(s=>s.toLowerCase().includes(search.toLowerCase())))
-    .filter(p=>{const pr=priceNum(p);if(priceFilter==='under30')return pr<30;if(priceFilter==='30to60')return pr>=30&&pr<=60;if(priceFilter==='over60')return pr>60;return true;});
-
+  let filtered=products.filter(p=>cat==='All'||p.category===cat).filter(p=>!search.trim()||[p.name,p.category,p.description||''].some(s=>s.toLowerCase().includes(search.toLowerCase()))).filter(p=>{const pr=priceNum(p);if(priceFilter==='under30')return pr<30;if(priceFilter==='30to60')return pr>=30&&pr<=60;if(priceFilter==='over60')return pr>60;return true;});
   if(sort==='low-high')filtered=[...filtered].sort((a,b)=>priceNum(a)-priceNum(b));
   if(sort==='high-low')filtered=[...filtered].sort((a,b)=>priceNum(b)-priceNum(a));
-
   const activeFilters=(search?1:0)+(priceFilter!=='all'?1:0)+(sort!=='default'?1:0)+(cat!=='All'?1:0);
-
   return (
     <section id="collections" className="py-32 px-6 md:px-12 bg-brand-cream">
       <div className="max-w-7xl mx-auto">
@@ -525,8 +809,16 @@ const ProductCatalog = ({ onSelect, wishlist, onToggleWishlist, reviews, product
 };
 
 // ─── Cart Drawer ──────────────────────────────────────────────────────────
-const CartDrawer = ({ items, onClose, onRemove, onUpdateQty, onCheckout }: { items: CartItem[]; onClose: ()=>void; onRemove: (id:string,size:string,color:string)=>void; onUpdateQty: (id:string,size:string,color:string,qty:number)=>void; onCheckout: ()=>void }) => {
+const CartDrawer = ({ items, onClose, onRemove, onUpdateQty, onCheckout, onOpenAuth, user }: {
+  items: CartItem[]; onClose: ()=>void; onRemove: (id:string,size:string,color:string)=>void;
+  onUpdateQty: (id:string,size:string,color:string,qty:number)=>void;
+  onCheckout: ()=>void; onOpenAuth: ()=>void; user: any;
+}) => {
   const total=items.reduce((s,i)=>s+parseFloat(i.product.price.replace('$',''))*i.qty,0);
+  const handleCheckout = () => {
+    onClose();
+    onCheckout();
+  };
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-end">
       <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={onClose} className="absolute inset-0 bg-brand-charcoal/40 backdrop-blur-sm cursor-pointer"/>
@@ -536,7 +828,7 @@ const CartDrawer = ({ items, onClose, onRemove, onUpdateQty, onCheckout }: { ite
           {items.length===0?<div className="text-center py-20"><p className="serif text-xl text-brand-charcoal/40 italic">Your bag is empty</p><a href="#collections" onClick={onClose} className="text-[11px] uppercase tracking-widest text-brand-gold font-bold mt-4 inline-block hover:underline">Continue Shopping</a></div>
             :items.map(item=>(
               <div key={`${item.product.id}-${item.selectedSize}-${item.selectedColor}`} className="flex gap-4">
-                <div className="w-20 h-28 bg-white overflow-hidden shrink-0"><img src={item.product.image} className="w-full h-full object-cover"/></div>
+                <div className="w-20 h-28 bg-white overflow-hidden shrink-0 rounded"><img src={item.product.image} className="w-full h-full object-cover"/></div>
                 <div className="flex-1 flex flex-col justify-between">
                   <div><h3 className="serif text-base text-brand-charcoal leading-tight">{item.product.name}</h3><p className="text-[10px] text-brand-charcoal/50 mt-0.5">{item.selectedSize} · {item.selectedColor}</p></div>
                   <div className="flex justify-between items-center">
@@ -550,8 +842,10 @@ const CartDrawer = ({ items, onClose, onRemove, onUpdateQty, onCheckout }: { ite
         {items.length>0&&(
           <div className="p-8 bg-white border-t border-brand-charcoal/5">
             <div className="flex justify-between items-center mb-2"><span className="text-[10px] uppercase tracking-widest text-brand-charcoal/60 font-bold">Subtotal</span><span className="serif text-2xl text-brand-charcoal">${total.toFixed(2)}</span></div>
-            <p className="text-[10px] text-brand-charcoal/50 uppercase tracking-widest mb-5">Taxes & shipping calculated at checkout</p>
-            <button onClick={()=>{onClose();onCheckout();}} className="w-full bg-brand-gold hover:bg-brand-charcoal text-white py-4 text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-2 mb-3"><ShieldCheck size={14}/> Proceed to Checkout</button>
+            <p className="text-[10px] text-brand-charcoal/50 uppercase tracking-widest mb-5">Free shipping · Secure checkout</p>
+            <button onClick={handleCheckout} className="w-full bg-brand-gold hover:bg-brand-charcoal text-white py-4 text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-2 mb-3">
+              <ShieldCheck size={14}/> {user ? 'Proceed to Checkout' : 'Login & Checkout'}
+            </button>
             <a href={`https://wa.me/918750590574?text=${encodeURIComponent('Hi! I want to place an order for '+items.map(i=>`${i.product.name} (${i.selectedSize}, ${i.selectedColor}) x${i.qty}`).join(', ')+`. Total: $${total.toFixed(2)}`)}`} target="_blank" rel="noopener noreferrer" className="w-full py-3 bg-green-500 hover:bg-green-600 text-white text-[11px] font-bold tracking-[0.2em] uppercase transition-colors flex items-center justify-center gap-2"><MessageCircle size={14}/> Order via WhatsApp</a>
           </div>
         )}
@@ -590,31 +884,21 @@ export default function App() {
   const [reviews, setReviews]               = useState<Review[]>(loadReviews);
   const [selectedProduct, setSelectedProduct] = useState<Product|null>(null);
   const [showAnnouncement, setShowAnnouncement] = useState(true);
-
-  // ⚡ KEY FIX: liveProducts starts with static PRODUCTS as fallback,
-  // then gets replaced by Firestore data on mount
-  const [liveProducts, setLiveProducts] = useState<Product[]>(PRODUCTS);
+  const [liveProducts, setLiveProducts]     = useState<Product[]>(PRODUCTS);
 
   useEffect(()=>{LS.set('shakya_cart_v1',cart);},[cart]);
   useEffect(()=>{LS.set('shakya_wishlist_v1',wishlist);},[wishlist]);
   useEffect(()=>{LS.set('shakya_recent_v1',recentlyViewed);},[recentlyViewed]);
   useEffect(()=>{LS.set('shakya_orders_v1',orders);},[orders]);
 
-  // ⚡ Fetch products from Firestore on mount
+  // Fetch live products from Firestore
   useEffect(() => {
     productService.getAll()
       .then(fsProducts => {
-        // Only active products visible on site
         const active = fsProducts.filter(p => p.active !== false);
-        if (active.length > 0) {
-          // FSProduct is structurally compatible with Product
-          setLiveProducts(active as unknown as Product[]);
-        }
-        // If empty, keep static PRODUCTS as fallback
+        if (active.length > 0) setLiveProducts(active as unknown as Product[]);
       })
-      .catch(err => {
-        console.warn('Firestore products fetch failed, using static data:', err);
-      });
+      .catch(() => {});
   }, []);
 
   const openProduct = useCallback((p: Product)=>{
@@ -630,11 +914,10 @@ export default function App() {
 
   const addBundleToCart = useCallback((bundle: Bundle)=>{
     bundle.productIds.forEach(id=>{
-      // Try liveProducts first, fallback to static
-      const p = liveProducts.find(pr=>pr.id===id) || PRODUCTS.find(pr=>pr.id===id);
-      if(p) addToCart(p,p.variants.sizes[0],p.variants.colors[0].name);
+      const p=liveProducts.find(pr=>pr.id===id)||PRODUCTS.find(pr=>pr.id===id);
+      if(p)addToCart(p,p.variants.sizes[0],p.variants.colors[0].name);
     });
-  },[addToCart, liveProducts]);
+  },[addToCart,liveProducts]);
 
   const removeFromCart = useCallback((id:string,size:string,color:string)=>{
     setCart(prev=>prev.filter(i=>!(i.product.id===id&&i.selectedSize===size&&i.selectedColor===color)));
@@ -649,14 +932,48 @@ export default function App() {
     setWishlist(prev=>prev.includes(id)?prev.filter(w=>w!==id):[...prev,id]);
   },[]);
 
-  const handleOrderSuccess = useCallback((order: Order)=>{
-    setOrders(prev=>[...prev,order]);
+  // ── Order Success — saves to Firestore + decrements stock ──────────────
+  const handleOrderSuccess = useCallback(async (order: Order) => {
+    setOrders(prev => [...prev, order]);
     setCart([]);
     setCheckoutOpen(false);
+
+    // 1. Save order to Firestore (always, with uid if logged in)
     if (user) {
-      orderService.save({ ...order, uid: user.uid } as Parameters<typeof orderService.save>[0]);
+      try {
+        await orderService.save({
+          id: order.id,
+          uid: user.uid,
+          items: order.items,
+          customer: order.customer,
+          shipping: order.shipping,
+          totalINR: order.totalINR,
+          totalUSD: order.totalUSD,
+          status: order.status,
+          cfOrderId: order.cfOrderId,
+          date: order.date,
+        } as any);
+      } catch (err) {
+        console.error('Order save failed:', err);
+      }
     }
-  },[user]);
+
+    // 2. Decrement stock for each ordered item
+    for (const item of order.items) {
+      try {
+        const current = liveProducts.find(p => p.id === item.product.id);
+        if (current && current.stock > 0) {
+          const newStock = Math.max(0, current.stock - item.qty);
+          await productService.update(item.product.id, { stock: newStock });
+          setLiveProducts(prev => prev.map(p =>
+            p.id === item.product.id ? { ...p, stock: newStock } : p
+          ));
+        }
+      } catch (err) {
+        console.error('Stock update failed:', err);
+      }
+    }
+  }, [user, liveProducts]);
 
   const refreshOrderStatus = useCallback(async(orderId:string)=>{
     try{const res=await fetch(`/api/order-status/${orderId}`);const data=await res.json() as {status:string};setOrders(prev=>prev.map(o=>o.id===orderId?{...o,status:data.status as Order['status']}:o));}
@@ -667,10 +984,7 @@ export default function App() {
     setReviews(prev=>{const exists=prev.find(x=>x.id===r.id);if(exists)return prev.map(x=>x.id===r.id?r:x);return[...prev,r];});
   },[]);
 
-  // Wishlist products: look in liveProducts first
-  const wishlistProducts = wishlist.map(id =>
-    liveProducts.find(p=>p.id===id) || PRODUCTS.find(p=>p.id===id)
-  ).filter(Boolean) as Product[];
+  const wishlistProducts = wishlist.map(id => liveProducts.find(p=>p.id===id)||PRODUCTS.find(p=>p.id===id)).filter(Boolean) as Product[];
 
   return (
     <div className="relative min-h-screen">
@@ -690,14 +1004,7 @@ export default function App() {
 
       <main>
         <Hero/><HeritageSection/>
-        {/* ⚡ Pass liveProducts to catalog — Firestore data shown here */}
-        <ProductCatalog
-          onSelect={openProduct}
-          wishlist={wishlist}
-          onToggleWishlist={toggleWishlist}
-          reviews={reviews}
-          products={liveProducts}
-        />
+        <ProductCatalog onSelect={openProduct} wishlist={wishlist} onToggleWishlist={toggleWishlist} reviews={reviews} products={liveProducts}/>
         <BundleDeals onAddBundle={addBundleToCart} liveProducts={liveProducts}/>
         <RecentlyViewed items={recentlyViewed} onSelect={openProduct}/>
         <LookbookSection/><ProcessSection/><CustomSection/><TestimonialsSection/><FAQSection/><ContactSection/>
@@ -705,8 +1012,12 @@ export default function App() {
       <Footer/>
       <FloatingButtons/>
 
-      <AnimatePresence>{cartOpen&&<CartDrawer items={cart} onClose={()=>setCartOpen(false)} onRemove={removeFromCart} onUpdateQty={updateQty} onCheckout={()=>setCheckoutOpen(true)}/>}</AnimatePresence>
-      <AnimatePresence>{checkoutOpen&&<CheckoutModal cart={cart} onClose={()=>setCheckoutOpen(false)} onSuccess={handleOrderSuccess}/>}</AnimatePresence>
+      <AnimatePresence>
+        {cartOpen&&<CartDrawer items={cart} onClose={()=>setCartOpen(false)} onRemove={removeFromCart} onUpdateQty={updateQty} onCheckout={()=>setCheckoutOpen(true)} onOpenAuth={()=>{setCartOpen(false);setAuthOpen(true);}} user={user}/>}
+      </AnimatePresence>
+      <AnimatePresence>
+        {checkoutOpen&&<CheckoutModal cart={cart} onClose={()=>setCheckoutOpen(false)} onSuccess={handleOrderSuccess} onOpenAuth={()=>{setCheckoutOpen(false);setAuthOpen(true);}}/>}
+      </AnimatePresence>
       <AnimatePresence>{wishlistOpen&&<WishlistDrawer wishlist={wishlistProducts} onClose={()=>setWishlistOpen(false)} onRemove={toggleWishlist} onSelect={openProduct} onAddToCart={addToCart}/>}</AnimatePresence>
       <AnimatePresence>{ordersOpen&&<OrdersDrawer orders={orders} onClose={()=>setOrdersOpen(false)} onRefreshStatus={refreshOrderStatus}/>}</AnimatePresence>
       <AnimatePresence>{adminOpen&&<AdminDashboard onClose={()=>setAdminOpen(false)}/>}</AnimatePresence>
@@ -718,4 +1029,3 @@ export default function App() {
     </div>
   );
 }
-
